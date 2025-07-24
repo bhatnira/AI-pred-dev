@@ -15,6 +15,16 @@ import deepchem as dc
 from lime import lime_tabular
 from sklearn.model_selection import train_test_split
 import seaborn as sns
+import os
+
+# Configure matplotlib and RDKit for headless mode
+os.environ['MPLBACKEND'] = 'Agg'
+if 'DISPLAY' not in os.environ:
+    os.environ['DISPLAY'] = ':99'
+
+# Disable RDKit warnings and configure for headless rendering
+from rdkit import RDLogger
+RDLogger.DisableLog('rdApp.*')
 
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(

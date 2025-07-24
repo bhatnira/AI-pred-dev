@@ -16,6 +16,15 @@ matplotlib.use('Agg')  # Set backend before importing pyplot
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import os
+
+# Configure matplotlib and RDKit for headless mode
+os.environ['MPLBACKEND'] = 'Agg'
+if 'DISPLAY' not in os.environ:
+    os.environ['DISPLAY'] = ':99'
+
+# Disable RDKit warnings and configure for headless rendering
+RDLogger.DisableLog('rdApp.*')
 
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(

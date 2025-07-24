@@ -22,6 +22,15 @@ import time
 import threading
 import queue
 
+# Configure matplotlib and RDKit for headless mode
+os.environ['MPLBACKEND'] = 'Agg'
+if 'DISPLAY' not in os.environ:
+    os.environ['DISPLAY'] = ':99'
+
+# Disable RDKit warnings and configure for headless rendering
+from rdkit import RDLogger
+RDLogger.DisableLog('rdApp.*')
+
 # Set random seed for reproducibility
 tf.random.set_seed(42)
 

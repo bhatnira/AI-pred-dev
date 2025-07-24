@@ -10,6 +10,8 @@ ENV PYTHONUNBUFFERED=1
 ENV STREAMLIT_SERVER_HEADLESS=true
 ENV STREAMLIT_SERVER_ENABLE_CORS=false
 ENV STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
+ENV DISPLAY=:99
+ENV MPLBACKEND=Agg
 
 # Install system dependencies required for chemistry packages
 RUN apt-get update && apt-get install -y \
@@ -23,6 +25,13 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libpng-dev \
     pkg-config \
+    libxrender1 \
+    libxext6 \
+    libfontconfig1 \
+    libxft2 \
+    libx11-6 \
+    libcairo2-dev \
+    libgirepository1.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and install wheel
@@ -41,6 +50,11 @@ COPY . .
 RUN mkdir -p .streamlit
 COPY .streamlit/config.toml .streamlit/
 
+# Set proper permissions and create startup script
+RUN chmod +x /app && \
+    echo '#!/bin/bash\nexport MPLBACKEND=Agg\nexport DISPLAY=:99\nstreamlit run main_app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false' > /app/start.sh && \
+    chmod +x /app/start.sh
+
 # Expose port
 EXPOSE 8501
 
@@ -49,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
 # Run the application
-CMD ["streamlit", "run", "main_app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
+CMD ["/app/start.sh"]
