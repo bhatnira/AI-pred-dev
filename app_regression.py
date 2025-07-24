@@ -11,6 +11,8 @@ import deepchem as dc
 import ssl
 from lime import lime_tabular
 from sklearn.model_selection import train_test_split
+import matplotlib
+matplotlib.use('Agg')  # Set backend before importing pyplot
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns

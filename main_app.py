@@ -4,6 +4,8 @@ from pathlib import Path
 import sys
 import importlib.util
 import os
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for Docker/server environments
 
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(
@@ -15,9 +17,8 @@ st.set_page_config(
 
 # Deployment configuration
 if 'RENDER' in os.environ:
-    # Running on Render.com
-    st.set_option('deprecation.showPyplotGlobalUse', False)
-    st.set_option('deprecation.showfileUploaderEncoding', False)
+    # Running on Render.com - removed deprecated options
+    pass
 
 # Apple-style iOS interface CSS
 st.markdown("""
