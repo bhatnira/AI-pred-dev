@@ -4,7 +4,29 @@
 
 A comprehensive iOS-style multipage Streamlit application for chemical machine learning, featuring AutoML activity and potency prediction using TPOT, RDKit, and DeepChem.
 
-## 🚀 Features
+## � Quick Start with Docker (Recommended)
+
+### Prerequisites
+- Docker installed on your system
+- Docker Compose (optional, for easier management)
+
+### Run with Docker
+```bash
+# Clone the repository
+git clone https://github.com/bhatnira/AI-Activity-Prediction.git
+cd AI-Activity-Prediction
+
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Or build and run manually
+docker build -t chemml-suite .
+docker run -p 8501:8501 chemml-suite
+
+# Access at http://localhost:8501
+```
+
+## �🚀 Features
 
 - **AutoML Activity Prediction**: Binary classification for chemical activity
 - **AutoML Potency Prediction**: Regression modeling for chemical potency
@@ -21,6 +43,46 @@ A comprehensive iOS-style multipage Streamlit application for chemical machine l
 - **Chemistry**: RDKit, DeepChem
 - **Visualization**: Matplotlib, Seaborn
 - **Data Processing**: Pandas, NumPy
+- **Deployment**: Docker, Render.com
+
+## 🐳 Docker Deployment
+
+### Docker Commands
+```bash
+# Build the image
+docker build -t chemml-suite .
+
+# Run container (foreground)
+docker run -p 8501:8501 chemml-suite
+
+# Run container (background)
+docker run -d -p 8501:8501 --name chemml chemml-suite
+
+# View logs
+docker logs chemml
+
+# Stop and remove
+docker stop chemml && docker rm chemml
+```
+
+### Docker Compose (Recommended)
+```bash
+# Start application
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop application
+docker-compose down
+```
+
+### Production Deployment (Render.com)
+The application is configured for automatic Docker deployment on Render.com:
+1. Fork this repository
+2. Connect to Render.com
+3. The `render.yaml` file configures Docker deployment automatically
+4. Uses Python 3.10 in a controlled Docker environment
 
 ## 📦 Installation
 
