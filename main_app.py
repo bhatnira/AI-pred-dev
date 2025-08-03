@@ -10,7 +10,7 @@ matplotlib.use('Agg')  # Use non-interactive backend for Docker/server environme
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(
     page_title="ChemML Suite",
-    page_icon="🧬",
+
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -27,7 +27,7 @@ st.markdown("""
     
     /* Global iOS-like styling */
     .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #fefcf7;
         font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
         color: #1d1d1f;
         min-height: 100vh;
@@ -52,10 +52,10 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border-radius: 20px;
-        padding: 16px 24px;
-        margin: 12px 0 20px 0;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        border-radius: 16px;
+        padding: 8px 16px;
+        margin: 4px 0 8px 0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
         border: 1px solid rgba(255, 255, 255, 0.3);
     }
     
@@ -63,8 +63,8 @@ st.markdown("""
     .app-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 24px;
-        margin: 24px 0;
+        gap: 12px;
+        margin: 8px 0;
         max-width: 1000px;
         margin-left: auto;
         margin-right: auto;
@@ -73,33 +73,33 @@ st.markdown("""
     
     /* iOS App Card */
     .app-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: linear-gradient(145deg, #ffffff, #f8f9ff);
         backdrop-filter: blur(25px);
         -webkit-backdrop-filter: blur(25px);
-        border-radius: 24px;
-        padding: 32px 24px;
+        border-radius: 20px;
+        padding: 16px 18px;
         text-align: center;
         transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        border: 1.5px solid rgba(255, 255, 255, 0.4);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 
-                    0 2px 8px rgba(0, 0, 0, 0.05);
+        border: 1.5px solid rgba(102, 126, 234, 0.2);
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15), 
+                    0 1px 8px rgba(102, 126, 234, 0.08);
         cursor: pointer;
         position: relative;
         overflow: hidden;
-        height: 160px;
+        height: 100px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
     }
     
     .app-card:hover {
-        transform: translateY(-8px) scale(1.02);
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 
-                    0 8px 24px rgba(0, 0, 0, 0.08),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-        background: rgba(255, 255, 255, 0.98);
-        border-color: rgba(255, 255, 255, 0.6);
+        transform: translateY(-4px) scale(1.01);
+        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.25), 
+                    0 6px 16px rgba(102, 126, 234, 0.15),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        background: linear-gradient(145deg, #ffffff, #f0f4ff);
+        border-color: rgba(102, 126, 234, 0.4);
     }
     
     .app-card::before {
@@ -109,9 +109,15 @@ st.markdown("""
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
-        border-radius: 24px 24px 0 0;
-        opacity: 0.8;
+        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe);
+        border-radius: 20px 20px 0 0;
+        opacity: 0.9;
+        animation: shimmer 3s ease-in-out infinite;
+    }
+    
+    @keyframes shimmer {
+        0%, 100% { opacity: 0.9; }
+        50% { opacity: 1; }
     }
     
     .app-card::after {
@@ -121,7 +127,7 @@ st.markdown("""
         left: -50%;
         width: 200%;
         height: 200%;
-        background: radial-gradient(circle, rgba(102, 126, 234, 0.03) 0%, transparent 70%);
+        background: radial-gradient(circle, rgba(102, 126, 234, 0.08) 0%, rgba(240, 244, 255, 0.05) 70%);
         opacity: 0;
         transition: opacity 0.4s ease;
         pointer-events: none;
@@ -133,77 +139,79 @@ st.markdown("""
     
     /* App Title */
     .app-title {
-        font-size: 1.5rem;
+        font-size: 1.1rem;
         font-weight: 800;
-        color: #1c1c1e;
-        margin-bottom: 12px;
+        color: #2c3e50;
+        margin-bottom: 6px;
         letter-spacing: -0.02em;
         line-height: 1.1;
         transition: all 0.3s ease;
         position: relative;
         z-index: 2;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        text-shadow: 0 1px 3px rgba(102, 126, 234, 0.1);
     }
     
     .app-card:hover .app-title {
-        color: #007AFF;
+        color: #667eea;
         transform: translateY(-1px);
-        text-shadow: 0 2px 6px rgba(0, 122, 255, 0.4);
+        text-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
     }
     
     /* App Description */
     .app-description {
-        font-size: 0.95rem;
-        color: #3a3a3c !important;
+        font-size: 0.75rem;
+        color: #5a6c7d !important;
         line-height: 1.3;
-        font-weight: 800;
+        font-weight: 700;
         margin: 0;
         overflow: hidden;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        -webkit-line-clamp: 1;
         -webkit-box-orient: vertical;
         transition: all 0.3s ease;
         position: relative;
         z-index: 2;
-        background: rgba(58, 58, 60, 0.15);
-        padding: 8px 16px;
-        border-radius: 16px;
-        border: 2px solid rgba(58, 58, 60, 0.3);
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        padding: 4px 8px;
+        border-radius: 12px;
+        border: 1.5px solid rgba(102, 126, 234, 0.3);
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        letter-spacing: 0.6px;
+        text-shadow: 0 1px 2px rgba(102, 126, 234, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
     }
     
     .app-card:hover .app-description {
         color: #ffffff !important;
-        background: rgba(0, 122, 255, 0.95);
-        border-color: rgba(0, 122, 255, 1);
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-color: #667eea;
         transform: translateY(-2px);
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-        box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
     
     /* Header */
     .main-header {
         text-align: center;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
     }
     
     .main-title {
-        font-size: 2.5rem;
+        font-size: 1.8rem;
         font-weight: 700;
         color: #1d1d1f !important;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         letter-spacing: -0.02em;
         line-height: 1.1;
         text-shadow: none;
     }
     
     .main-subtitle {
-        font-size: 1.1rem;
+        font-size: 0.9rem;
         color: #1d1d1f !important;
         font-weight: 500;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
         line-height: 1.3;
     }
     
@@ -227,11 +235,11 @@ st.markdown("""
     /* Footer */
     .footer {
         text-align: center;
-        margin-top: 32px;
-        padding: 16px;
-        color: rgba(255, 255, 255, 0.6);
-        font-size: 0.8rem;
-        line-height: 1.4;
+        margin-top: 8px;
+        padding: 8px;
+        color: rgba(29, 29, 31, 0.6);
+        font-size: 0.7rem;
+        line-height: 1.2;
     }
     
     /* Mobile responsiveness */
@@ -380,17 +388,17 @@ st.markdown("""
     }
     
     ::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(29, 29, 31, 0.1);
         border-radius: 3px;
     }
     
     ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.3);
+        background: rgba(29, 29, 31, 0.3);
         border-radius: 3px;
     }
     
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.4);
+        background: rgba(29, 29, 31, 0.4);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -447,11 +455,11 @@ def render_home():
                 AI Based Activity and Potency Prediction
             </p>
             <p style="
-                font-size: 0.95rem;
+                font-size: 0.8rem;
                 color: #1d1d1f !important;
                 font-weight: 400;
                 margin: 0;
-                line-height: 1.3;
+                line-height: 1.2;
             ">
                 Modeling and Deployment
             </p>
@@ -469,16 +477,19 @@ def render_home():
         col = cols[i % 2]
         
         with col:
+            # Make the card clickable to directly run the app
+            if st.button(f"🚀 {app_info['title']}", key=f"card_{app_key}", 
+                        help=f"Click to launch {app_info['description']} application"):
+                st.session_state.current_app = app_key
+                st.rerun()
+            
+            # Visual card display (non-clickable, for aesthetics)
             st.markdown(f"""
-            <div class="app-card">
+            <div class="app-card" style="margin-top: -45px; pointer-events: none;">
                 <h3 class="app-title">{app_info['title']}</h3>
                 <p class="app-description">{app_info['description']}</p>
             </div>
             """, unsafe_allow_html=True)
-            
-            if st.button(f"Launch {app_info['title']}", key=f"btn_{app_key}"):
-                st.session_state.current_app = app_key
-                st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -492,44 +503,37 @@ def render_home():
 
 def render_app_header(app_info):
     """Render app header with back button"""
-    st.markdown(f"""
-    <div style="
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-radius: 16px;
-        padding: 12px 20px;
-        margin-bottom: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    ">
-        <div style="flex: 1;"></div>
-        <div style="
-            text-align: center;
-            flex: 2;
-        ">
-            <h1 style="
-                color: white;
-                margin: 0;
-                font-size: 1.8rem;
-                font-weight: 600;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            ">
-                {app_info['title']}
-            </h1>
-        </div>
-        <div style="flex: 1;"></div>
-    </div>
-    """, unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1, 6, 1])
     
     with col1:
-        if st.button("← Back", key="back_btn"):
+        if st.button("← Back", key="back_btn", help="Return to main menu"):
             st.session_state.current_app = 'home'
             st.rerun()
+    
+    with col2:
+        st.markdown(f"""
+        <div style="
+            text-align: center;
+            padding: 8px 0;
+        ">
+            <h1 style="
+                color: #2c3e50;
+                margin: 0;
+                font-size: 1.5rem;
+                font-weight: 600;
+            ">
+                🧬 {app_info['title']}
+            </h1>
+            <p style="
+                color: #667eea;
+                margin: 4px 0 0 0;
+                font-size: 0.9rem;
+                font-weight: 500;
+            ">
+                {app_info['description']} Application
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
 def run_individual_app(app_key):
     """Run an individual app"""
@@ -538,47 +542,75 @@ def run_individual_app(app_key):
     
     # Check if file exists
     if not os.path.exists(app_file):
-        st.error(f"App file '{app_file}' not found!")
+        st.error(f"❌ App file '{app_file}' not found!")
+        st.info("📂 Available files in current directory:")
+        import os
+        for file in os.listdir('.'):
+            if file.endswith('.py'):
+                st.write(f"  • {file}")
         return
     
-    # Render header
+    # Render header with back navigation
     render_app_header(app_info)
     
-    # Reduce spacing
-    st.markdown('<div style="margin-top: -8px;"></div>', unsafe_allow_html=True)
-    
-    # Load and run the app
+    # Load and execute the app
     try:
+        st.info(f"🔄 Loading {app_info['title']}...")
+        
         # Read the app file content
-        with open(app_file, 'r') as f:
+        with open(app_file, 'r', encoding='utf-8') as f:
             app_content = f.read()
         
-        # Remove the st.set_page_config call to avoid conflicts
+        # Remove conflicting st.set_page_config calls
         lines = app_content.split('\n')
         filtered_lines = []
-        skip_next = False
+        skip_config = False
         
         for line in lines:
             if 'st.set_page_config' in line:
-                skip_next = True
+                skip_config = True
                 continue
-            elif skip_next and line.strip().startswith(')'):
-                skip_next = False
-                continue
-            elif skip_next and ('=' in line or line.strip().startswith('"')):
+            elif skip_config and (line.strip().endswith(')') or line.strip() == ''):
+                skip_config = False
+                if line.strip().endswith(')'):
+                    continue
+            elif skip_config:
                 continue
             else:
-                skip_next = False
                 filtered_lines.append(line)
         
         modified_content = '\n'.join(filtered_lines)
         
-        # Execute the modified app content
-        exec(modified_content, globals())
+        # Create a clean namespace for the app
+        app_globals = {
+            '__name__': '__main__',
+            'st': st,
+            'pd': pd,
+            'os': os,
+            'sys': sys,
+            'Path': Path,
+            'matplotlib': matplotlib
+        }
+        
+        # Execute the app content
+        exec(modified_content, app_globals)
+        
+        st.success(f"✅ {app_info['title']} loaded successfully!")
+        
+    except ImportError as e:
+        st.error(f"❌ Import Error: {str(e)}")
+        st.info("💡 This might be due to missing dependencies in the Docker container.")
+        st.code(f"pip install {str(e).split()[-1]}", language="bash")
         
     except Exception as e:
-        st.error(f"Error running app: {str(e)}")
-        st.info("Click 'Back' to return to the main menu")
+        st.error(f"❌ Error running {app_info['title']}: {str(e)}")
+        st.info("🔙 Click 'Back' to return to the main menu")
+        
+        # Show error details in expandable section
+        with st.expander("🔍 View Error Details"):
+            st.code(str(e), language="python")
+            import traceback
+            st.code(traceback.format_exc(), language="python")
 
 # Main app logic
 def main():

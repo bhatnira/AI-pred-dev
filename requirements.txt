@@ -27,7 +27,7 @@ google-auth==2.32.0
 google-auth-oauthlib==1.2.1
 google-pasta==0.2.0
 grpcio==1.65.4
-h5py==3.11.0
+# h5py==3.11.0  # Temporarily commented out due to build issues
 idna==3.7
 imageio==2.34.2
 ipython==8.26.0

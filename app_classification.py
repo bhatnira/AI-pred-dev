@@ -28,7 +28,7 @@ RDLogger.DisableLog('rdApp.*')
 
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(
-    page_title="ChemML Predictor",
+    page_title="ChemML Predictor - TPOT Classification",
     page_icon="🧪",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -812,7 +812,7 @@ def main():
         st.session_state.selected_featurizer_name = list(Featurizer.keys())[0]  # Set default featurizer
 
     # Create main header
-    st.markdown(create_ios_header("ChemML Predictor", "AI-Powered Chemical Activity Prediction"), unsafe_allow_html=True)
+    st.markdown(create_ios_header("ChemML TPOT Classifier", "Traditional AutoML for Chemical Activity Prediction"), unsafe_allow_html=True)
 
     # Mobile-friendly navigation using tabs
     tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "🔬 Build Model", "🧪 Single Prediction", "📊 Batch Prediction"])
@@ -944,30 +944,85 @@ def main():
                 prediction, probability, explanation_html = predict_from_single_smiles(smile_input, st.session_state.selected_featurizer_name)
                 
                 if prediction is not None:
-                    # Display results in iOS-style layout
-                    col1, col2 = st.columns([1, 1])
+                    # Compact display with smaller structure and combined results
+                    col1, col2 = st.columns([1, 2])
                     
                     with col1:
-                        # Display molecular structure
+                        # Display compact molecular structure
                         try:
                             mol = Chem.MolFromSmiles(smile_input)
                             if mol:
-                                img = Draw.MolToImage(mol, size=(300, 300))
-                                st.markdown('<div class="ios-card">', unsafe_allow_html=True)
-                                st.image(img, use_column_width=True)
-                                st.markdown('</div>', unsafe_allow_html=True)
+                                img = Draw.MolToImage(mol, size=(200, 200))
+                                st.markdown("""
+                                <div class="ios-card" style="padding: 16px; text-align: center;">
+                                    <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600;">Molecule Structure</h4>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.image(img, width=180)
                         except:
-                            pass
+                            st.markdown("""
+                            <div class="ios-card" style="padding: 16px; text-align: center;">
+                                <h4 style="margin: 0; color: #8E8E93;">Structure unavailable</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
                     
                     with col2:
-                        # Prediction results in iOS card
-                        st.markdown(create_prediction_result_card(prediction, probability, smile_input), unsafe_allow_html=True)
+                        # Prediction results in compact iOS card
+                        activity_icon = "🟢" if prediction == 1 else "🔴"
+                        activity_text = "Active" if prediction == 1 else "Not Active"
+                        confidence_color = "#34C759" if prediction == 1 else "#FF3B30"
+                        
+                        st.markdown(f"""
+                        <div class="ios-card" style="padding: 20px;">
+                            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                                <div style="font-size: 2em; margin-right: 12px;">{activity_icon}</div>
+                                <div>
+                                    <h2 style="color: {confidence_color}; margin: 0; font-weight: 700; font-size: 1.5em;">{activity_text}</h2>
+                                    <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Prediction Result</p>
+                                </div>
+                            </div>
+                            <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
+                                    <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{probability:.1%}</span>
+                                </div>
+                            </div>
+                            <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
+                                <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
+                                    <strong>SMILES:</strong> {smile_input}
+                                </p>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                     
-                    # LIME explanation
+                    # LIME explanation in proper iOS card style
                     if explanation_html:
-                        st.markdown(create_ios_card("Model Explanation", 
-                                                  f'<a href="data:text/html;base64,{base64.b64encode(explanation_html.encode()).decode()}" download="LIME_Explanation.html" style="color: #007AFF; text-decoration: none; font-weight: 600;">📥 Download Detailed Explanation</a>',
-                                                  "�"), unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="ios-card" style="margin-top: 16px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div style="display: flex; align-items: center;">
+                                    <div style="font-size: 1.5em; margin-right: 12px;">🔍</div>
+                                    <div>
+                                        <h3 style="color: #007AFF; margin: 0; font-weight: 600; font-size: 18px;">Model Explanation</h3>
+                                        <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Understand how the model made this prediction</p>
+                                    </div>
+                                </div>
+                                <a href="data:text/html;base64,{base64.b64encode(explanation_html.encode()).decode()}" 
+                                   download="LIME_Explanation.html" 
+                                   style="background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%); 
+                                          color: white; 
+                                          text-decoration: none; 
+                                          padding: 10px 16px; 
+                                          border-radius: 10px; 
+                                          font-weight: 600; 
+                                          font-size: 14px;
+                                          box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+                                          transition: all 0.2s ease;">
+                                    📥 Download Explanation
+                                </a>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                 else:
                     st.error("❌ Failed to make prediction. Please check your SMILES input.")
 
@@ -1058,8 +1113,99 @@ def main():
                     df['Predicted_Activity'] = predictions
                     df['Confidence'] = [f"{p:.1%}" if isinstance(p, float) else "N/A" for p in probabilities]
 
-                    # Display results in iOS card
-                    st.markdown(create_ios_card("Prediction Results", 
+                    # Display individual results first in iOS cards
+                    st.markdown("### 🧪 Individual Prediction Results")
+                    
+                    # Show results in expandable sections for better organization
+                    results_per_page = 5  # Show 5 results at a time
+                    total_valid_molecules = sum(1 for p in predictions if p in ["Active", "Not Active"])
+                    
+                    if total_valid_molecules > 0:
+                        # Create pagination for large datasets
+                        num_pages = (total_valid_molecules + results_per_page - 1) // results_per_page
+                        
+                        if num_pages > 1:
+                            page = st.selectbox("📄 Select Results Page", 
+                                              options=list(range(1, num_pages + 1)), 
+                                              format_func=lambda x: f"Page {x} ({min(results_per_page, total_valid_molecules - (x-1)*results_per_page)} results)")
+                        else:
+                            page = 1
+                        
+                        # Calculate indices for current page
+                        valid_indices = [i for i, p in enumerate(predictions) if p in ["Active", "Not Active"]]
+                        start_idx = (page - 1) * results_per_page
+                        end_idx = min(start_idx + results_per_page, len(valid_indices))
+                        current_page_indices = valid_indices[start_idx:end_idx]
+                        
+                        # Display individual results for current page
+                        for idx in current_page_indices:
+                            row = df.iloc[idx]
+                            prediction = predictions[idx]
+                            probability = probabilities[idx]
+                            smiles = row[smiles_col_predict]
+                            
+                            with st.expander(f"🧬 Molecule {idx + 1}: {prediction} ({probability:.1%} confidence)", expanded=False):
+                                # Create columns for structure and results
+                                col1, col2 = st.columns([1, 2])
+                                
+                                with col1:
+                                    # Display molecular structure
+                                    try:
+                                        mol = Chem.MolFromSmiles(smiles)
+                                        if mol:
+                                            img = Draw.MolToImage(mol, size=(200, 200))
+                                            st.markdown("""
+                                            <div class="ios-card" style="padding: 16px; text-align: center;">
+                                                <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600;">Molecule Structure</h4>
+                                            </div>
+                                            """, unsafe_allow_html=True)
+                                            st.image(img, width=180)
+                                    except:
+                                        st.markdown("""
+                                        <div class="ios-card" style="padding: 16px; text-align: center;">
+                                            <h4 style="margin: 0; color: #8E8E93;">Structure unavailable</h4>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                
+                                with col2:
+                                    # Prediction results in compact iOS card
+                                    activity_icon = "🟢" if prediction == "Active" else "🔴"
+                                    confidence_color = "#34C759" if prediction == "Active" else "#FF3B30"
+                                    
+                                    st.markdown(f"""
+                                    <div class="ios-card" style="padding: 20px;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                                            <div style="font-size: 2em; margin-right: 12px;">{activity_icon}</div>
+                                            <div>
+                                                <h2 style="color: {confidence_color}; margin: 0; font-weight: 700; font-size: 1.5em;">{prediction}</h2>
+                                                <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Prediction Result</p>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
+                                                <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{probability:.1%}</span>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
+                                            <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
+                                                <strong>SMILES:</strong> {smiles}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                
+                                # Add any additional row data
+                                other_columns = [col for col in row.index if col != smiles_col_predict and not col.startswith('Predicted_') and col != 'Confidence']
+                                if other_columns:
+                                    st.markdown("#### 📋 Additional Data")
+                                    for col in other_columns:
+                                        st.write(f"**{col}:** {row[col]}")
+
+                    # Display table results
+                    st.markdown("### 📊 Complete Results Table")
+                    # Display table results in iOS card
+                    st.markdown(create_ios_card("Complete Prediction Results", 
                                               "Your batch prediction results are ready!", "📊"), unsafe_allow_html=True)
                     st.dataframe(df, use_container_width=True)
                     

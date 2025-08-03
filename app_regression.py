@@ -552,16 +552,6 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         # Calculate actual training time
         training_end_time = time.time()
         actual_training_time = training_end_time - training_start_time
-        
-        st.success(f"✅ Training completed in {format_time_duration(actual_training_time)}")
-        
-        # Compare estimated vs actual time
-        time_difference = actual_training_time - estimated_time
-        if abs(time_difference) > 30:  # If difference is more than 30 seconds
-            if time_difference > 0:
-                st.info(f"📊 Training took {format_time_duration(abs(time_difference))} longer than estimated")
-            else:
-                st.info(f"🚀 Training was {format_time_duration(abs(time_difference))} faster than estimated")
     
     # Model evaluation with time tracking
     with st.spinner("Evaluating model performance..."):
@@ -575,12 +565,9 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         
         evaluation_end_time = time.time()
         evaluation_time = evaluation_end_time - evaluation_start_time
-        
-        st.success(f"✅ Model evaluation completed in {format_time_duration(evaluation_time)}")
     
     # Calculate total processing time
     total_time = time.time() - training_start_time
-    st.success(f"🎉 Total training and evaluation time: {format_time_duration(total_time)}")
     
     # Display best pipeline
     st.markdown("### Best TPOT Pipeline")
@@ -953,8 +940,13 @@ def main():
         with col2:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("💡 Use Example", use_container_width=True):
-                smiles_input = "CCO"
+                st.session_state.example_smiles = "CCO"
                 st.rerun()
+        
+        # Use example SMILES if set
+        if hasattr(st.session_state, 'example_smiles') and st.session_state.example_smiles and not smiles_input:
+            smiles_input = st.session_state.example_smiles
+            st.session_state.example_smiles = None  # Clear after use
 
         if st.button("🔮 Predict Property", use_container_width=True):
             if smiles_input:
@@ -964,10 +956,36 @@ def main():
                 if result[0] is not None:
                     prediction, explanation_html, img, standardized_smiles = result
                     
-                    # Results layout
-                    col1, col2 = st.columns([1, 1])
+                    # Results layout - compact 1:2 ratio for mobile-friendly display
+                    col1, col2 = st.columns([1, 2])
                     
                     with col1:
+                        # Compact molecular structure display
+                        st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
+                        # Resize image to 200x200 for compact display
+                        from PIL import Image
+                        import io
+                        
+                        # Convert RDKit image to PIL and resize
+                        img_buffer = io.BytesIO()
+                        img.save(img_buffer, format='PNG')
+                        img_buffer.seek(0)
+                        pil_img = Image.open(img_buffer)
+                        resized_img = pil_img.resize((200, 200), Image.Resampling.LANCZOS)
+                        
+                        st.image(resized_img, caption='2D Structure', use_column_width=True)
+                        
+                        # Compact Model Explanation below structure
+                        with st.expander("🔍 Model Explanation", expanded=False):
+                            st.download_button(
+                                "📥 Download LIME Explanation", 
+                                data=explanation_html,
+                                file_name=f"lime_explanation_{smiles_input.replace('/', '_')}.html",
+                                mime="text/html",
+                                use_container_width=True
+                            )
+                    
+                    with col2:
                         st.markdown(create_prediction_result_card(prediction, "High", standardized_smiles), unsafe_allow_html=True)
                         
                         # Additional info
@@ -977,20 +995,6 @@ def main():
                                    <p><strong>Standardized:</strong> {standardized_smiles}</p>
                                    <p><strong>Featurizer:</strong> {st.session_state.selected_featurizer_name}</p>
                                    """, "ℹ️"), unsafe_allow_html=True)
-                    
-                    with col2:
-                        st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
-                        st.image(img, caption='2D Molecular Structure', use_column_width=True)
-                    
-                    # LIME explanation
-                    st.markdown("### 🔍 Model Explanation")
-                    st.download_button(
-                        "📥 Download Detailed Explanation", 
-                        data=explanation_html,
-                        file_name=f"explanation_{smiles_input.replace('/', '_')}.html",
-                        mime="text/html",
-                        use_container_width=True
-                    )
 
     with tab4:
         st.markdown("### 📊 Batch Prediction")
@@ -1099,8 +1103,100 @@ def main():
                             for failed in failed_molecules:
                                 st.write(f"• {failed}")
                     
-                    # Results table
-                    st.markdown("### 📋 Prediction Results")
+                    # Individual results section with pagination
+                    st.markdown("### 🧬 Individual Molecule Results")
+                    
+                    # Create list of successful results with molecule images
+                    successful_results = []
+                    for idx, (smiles, prediction) in enumerate(zip(pred_df[pred_smiles_col], predictions)):
+                        if prediction is not None:
+                            try:
+                                # Re-run prediction to get LIME explanation
+                                result = predict_from_single_smiles(smiles, st.session_state.selected_featurizer_name)
+                                if result[0] is not None:
+                                    prediction_value, explanation_html, img, standardized_smiles = result
+                                    
+                                    # Resize image to 200x200 for batch display
+                                    img = Chem.Draw.MolToImage(Chem.MolFromSmiles(standardized_smiles), size=(200, 200))
+                                    
+                                    successful_results.append({
+                                        'index': idx + 1,
+                                        'smiles': smiles,
+                                        'standardized_smiles': standardized_smiles,
+                                        'prediction': prediction_value,
+                                        'img': img,
+                                        'explanation_html': explanation_html,
+                                        'additional_data': {col: pred_df.iloc[idx][col] for col in pred_df.columns if col not in [pred_smiles_col, 'Predicted_Property']}
+                                    })
+                            except:
+                                continue
+                    
+                    # Pagination for individual results
+                    results_per_page = 5
+                    total_results = len(successful_results)
+                    total_pages = (total_results - 1) // results_per_page + 1 if total_results > 0 else 1
+                    
+                    if total_results > 0:
+                        # Page selector
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col2:
+                            current_page = st.selectbox(
+                                f"📄 Page (Showing {results_per_page} results per page)",
+                                options=list(range(1, total_pages + 1)),
+                                format_func=lambda x: f"Page {x} of {total_pages}"
+                            ) - 1
+                        
+                        # Display results for current page
+                        start_idx = current_page * results_per_page
+                        end_idx = min(start_idx + results_per_page, total_results)
+                        
+                        for i in range(start_idx, end_idx):
+                            result = successful_results[i]
+                            
+                            with st.expander(f"🧬 Molecule {result['index']}: {result['smiles'][:50]}{'...' if len(result['smiles']) > 50 else ''}", expanded=False):
+                                # Create two columns for molecule display
+                                mol_col1, mol_col2 = st.columns([1, 2])
+                                
+                                with mol_col1:
+                                    # Display molecule structure
+                                    st.image(result['img'], caption='Molecular Structure', use_column_width=True)
+                                
+                                with mol_col2:
+                                    # Prediction result card
+                                    prediction_value = result['prediction']
+                                    prediction_icon = "📈" if prediction_value > 0 else "📉"
+                                    prediction_color = "#34C759" if prediction_value > 0 else "#FF6B6B"
+                                    
+                                    st.markdown(f"""
+                                    <div class="ios-card">
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 2em; margin-bottom: 12px;">{prediction_icon}</div>
+                                            <h3 style="color: {prediction_color}; margin: 0; font-weight: 600;">Predicted Property</h3>
+                                            <h2 style="color: #1D1D1F; margin: 8px 0; font-weight: 700; font-size: 1.8em;">{prediction_value:.4f}</h2>
+                                            <div style="background: rgba(0, 122, 255, 0.1); border-radius: 8px; padding: 12px; margin: 12px 0;">
+                                                <p style="margin: 0; color: #007AFF; font-weight: 500; font-size: 12px;">SMILES</p>
+                                                <p style="margin: 4px 0 0 0; color: #1D1D1F; font-weight: 600; font-size: 14px; word-break: break-all;">{result['standardized_smiles']}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Model Explanation below predicted property
+                                    st.markdown("**🔍 Model Explanation**")
+                                    st.download_button(
+                                        f"📥 Download LIME Explanation",
+                                        data=result['explanation_html'],
+                                        file_name=f"lime_explanation_molecule_{result['index']}_{result['smiles'][:20].replace('/', '_')}.html",
+                                        mime="text/html",
+                                        use_container_width=True,
+                                        key=f"download_lime_right_{result['index']}"
+                                    )
+
+                    else:
+                        st.info("No successful predictions to display individually.")
+                    
+                    # Complete results table
+                    st.markdown("### 📋 Complete Prediction Results")
                     st.dataframe(pred_df, use_container_width=True)
                     
                     # Download options

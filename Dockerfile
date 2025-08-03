@@ -13,26 +13,21 @@ ENV STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 ENV DISPLAY=:99
 ENV MPLBACKEND=Agg
 
-# Install system dependencies required for chemistry packages
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
     gcc \
     g++ \
-    curl \
+    cmake \
     libboost-all-dev \
-    libeigen3-dev \
-    libfreetype6-dev \
-    libpng-dev \
+    libhdf5-dev \
+    libhdf5-serial-dev \
     pkg-config \
-    libxrender1 \
-    libxext6 \
-    libfontconfig1 \
-    libxft2 \
-    libx11-6 \
-    libcairo2-dev \
-    libgirepository1.0-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Set HDF5 environment variables for h5py
+ENV HDF5_DIR=/usr
+ENV HDF5_VERSION=1.10.7
 
 # Upgrade pip and install wheel
 RUN python -m pip install --upgrade pip wheel setuptools
