@@ -110,27 +110,6 @@ pip install -r requirements.txt
 streamlit run main_app.py
 ```
 
-### Render.com Deployment
-
-This application is configured for easy deployment on Render.com:
-
-1. **Fork this repository** to your GitHub account
-
-2. **Connect to Render.com**:
-   - Sign up/login to [Render.com](https://render.com)
-   - Click "New" → "Web Service"
-   - Connect your GitHub repository
-
-3. **Configure the service**:
-   - **Environment**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `streamlit run main_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false`
-   - **Plan**: Free tier is sufficient for testing
-
-4. **Deploy**: Click "Create Web Service"
-
-The app will be automatically deployed and accessible via the provided Render.com URL.
-
 ## 🔧 Configuration Files
 
 - `render.yaml`: Render.com service configuration
