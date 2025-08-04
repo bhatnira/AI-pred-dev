@@ -86,11 +86,11 @@ st.markdown("""
         cursor: pointer;
         position: relative;
         overflow: hidden;
-        height: 100px;
+        height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        margin-bottom: 4px;
+        margin-bottom: 12px;
     }
     
     .app-card:hover {
@@ -320,11 +320,13 @@ st.markdown("""
         box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3),
                     0 2px 8px rgba(102, 126, 234, 0.15);
         width: 100%;
-        margin-top: 12px;
-        height: 42px;
+        margin-top: 8px;
+        height: 48px;
         letter-spacing: 0.3px;
         position: relative;
         overflow: hidden;
+        z-index: 10;
+        opacity: 1;
     }
     
     .stButton > button::before {
@@ -477,19 +479,19 @@ def render_home():
         col = cols[i % 2]
         
         with col:
-            # Make the card clickable to directly run the app
-            if st.button(f"🚀 {app_info['title']}", key=f"card_{app_key}", 
-                        help=f"Click to launch {app_info['description']} application"):
-                st.session_state.current_app = app_key
-                st.rerun()
-            
-            # Visual card display (non-clickable, for aesthetics)
+            # Create a clickable card container
             st.markdown(f"""
-            <div class="app-card" style="margin-top: -45px; pointer-events: none;">
+            <div class="app-card" style="margin-bottom: 20px;">
                 <h3 class="app-title">{app_info['title']}</h3>
                 <p class="app-description">{app_info['description']}</p>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Place the button below the card with proper spacing
+            if st.button(f"🚀 Launch {app_info['description']}", key=f"card_{app_key}", 
+                        help=f"Click to launch {app_info['title']} application"):
+                st.session_state.current_app = app_key
+                st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
     
