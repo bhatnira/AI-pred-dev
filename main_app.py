@@ -546,7 +546,6 @@ def run_individual_app(app_key):
     if not os.path.exists(app_file):
         st.error(f"❌ App file '{app_file}' not found!")
         st.info("📂 Available files in current directory:")
-        import os
         for file in os.listdir('.'):
             if file.endswith('.py'):
                 st.write(f"  • {file}")

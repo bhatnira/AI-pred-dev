@@ -23,6 +23,12 @@ RUN apt-get update && apt-get install -y \
     libhdf5-serial-dev \
     pkg-config \
     curl \
+    libx11-6 \
+    libxrender1 \
+    libxext6 \
+    libxft2 \
+    libfreetype6 \
+    libfontconfig1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set HDF5 environment variables for h5py
