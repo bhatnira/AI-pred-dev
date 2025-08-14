@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Git initialization script for ChemML Suite
-echo "🔧 Initializing Git repository for ChemML Suite..."
+# Git initialization script for Chemlara Suite
+echo "🔧 Initializing Git repository for Chemlara Suite..."
 
 # Initialize git repository if not already initialized
 if [ ! -d ".git" ]; then
@@ -10,7 +10,7 @@ if [ ! -d ".git" ]; then
     
     # Set up initial commit
     git add .
-    git commit -m "Initial commit: ChemML Suite - iOS-style multipage ML app
+    git commit -m "Initial commit: Chemlara Suite - iOS-style multipage ML app
 
 Features:
 - AutoML Activity and Potency Prediction
@@ -51,4 +51,4 @@ echo "   - requirements.txt (dependencies)"
 echo "   - Procfile (start command)"
 echo "   - runtime.txt (Python version)"
 echo ""
-echo "✨ Your ChemML Suite is ready for deployment!"
+echo "✨ Your Chemlara Suite is ready for deployment!"

@@ -1,4 +1,4 @@
-# ChemML Suite 🧬
+# Chemlara Suite 🧬
 
 An iOS-style multipage Streamlit application for chemical machine learning, featuring four specialized apps for molecular analysis and prediction.
 
@@ -34,7 +34,7 @@ An iOS-style multipage Streamlit application for chemical machine learning, feat
 2. **Launch the Suite**:
    ```bash
    # Option 1: Use the launcher script
-   ./run_chemml_suite.sh
+   ./run_chemlara_suite.sh
    
    # Option 2: Direct Streamlit command
    streamlit run main_app.py
@@ -79,7 +79,7 @@ Each app maintains its original functionality:
 ├── app_regression.py        # Regression application
 ├── app_graph_classification.py  # Graph classification
 ├── app_graph_regression.py     # Graph regression
-├── run_chemml_suite.sh      # Launch script
+├── run_chemlara_suite.sh      # Launch script
 ├── requirements.txt         # Python dependencies
 └── README.md               # This file
 ```

@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# ChemML Suite Quick Start Script
+#!/bin/bash
+# Chemlara Suite Quick Start Script
 # ================================
 
 set -e  # Exit on any error
 
-echo "🧪 ChemML Suite - Quick Start"
+echo "🧪 Chemlara Suite - Quick Start"
 echo "=============================="
 
 # Check if Docker is available
@@ -36,12 +37,12 @@ echo "🛑 Stopping any existing containers..."
 docker-compose down --remove-orphans 2>/dev/null || true
 
 # Build and start the application
-echo "🚀 Building and starting ChemML Suite..."
+echo "🚀 Building and starting Chemlara Suite..."
 echo "   This may take a few minutes on first run..."
 
 if docker-compose up --build -d; then
     echo ""
-    echo "🎉 SUCCESS! ChemML Suite is now running!"
+    echo "🎉 SUCCESS! Chemlara Suite is now running!"
     echo ""
     echo "📱 Access your application at:"
     echo "   🌐 http://localhost:8501"
@@ -78,7 +79,7 @@ if docker-compose up --build -d; then
     fi
     
 else
-    echo "❌ Failed to start ChemML Suite. Check the logs with:"
+    echo "❌ Failed to start Chemlara Suite. Check the logs with:"
     echo "   docker-compose logs"
     exit 1
 fi

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# ChemML Suite Launcher
+# Chemlara Suite Launcher
 # This script activates the virtual environment and starts the main app
 
-echo "🧬 Starting ChemML Suite..."
+echo "🧬 Starting Chemlara Suite..."
 echo "================================"
 
 # Check if virtual environment exists
@@ -29,7 +29,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Start the main app
-echo "🚀 Launching ChemML Suite..."
+echo "🚀 Launching Chemlara Suite..."
 echo "📱 Open your browser to view the iOS-style interface"
 echo "🔗 URL will be displayed below:"
 echo "================================"

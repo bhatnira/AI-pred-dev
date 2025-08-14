@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
-ChemML Suite Setup Verification Script
-=====================================
+Chemlara Suite Setup Verification Script
+==        result = subprocess.run(['docker', 'ps', '--filter', 'name=chemlara-suite'], 
+                               capture_output=True, text=True)
+        if 'chemlara-suite' in result.stdout:
+            print("✅ Chemlara Suite container: Running")
+            return True
+        else:
+            print("⚠️  Chemlara Suite container: Not running")============================
 
 This script verifies that all essential components are properly installed
-and configured for the ChemML Suite application.
+and configured for the Chemlara Suite application.
 """
 
 import sys
@@ -68,13 +74,13 @@ def check_docker_status():
             return False
             
         # Check if container is running
-        result = subprocess.run(['docker', 'ps', '--filter', 'name=chemml-suite'], 
+        result = subprocess.run(['docker', 'ps', '--filter', 'name=chemlara-suite'], 
                               capture_output=True, text=True, timeout=5)
-        if 'chemml-suite' in result.stdout:
-            print("✅ ChemML Suite container: Running")
+        if 'chemlara-suite' in result.stdout:
+            print("✅ Chemlara Suite container: Running")
             return True
         else:
-            print("⚠️  ChemML Suite container: Not running")
+            print("⚠️  Chemlara Suite container: Not running")
             return False
             
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -106,7 +112,7 @@ def check_streamlit_config():
 
 def main():
     """Main verification function"""
-    print("🧪 ChemML Suite Setup Verification")
+    print("🧪 Chemlara Suite Setup Verification")
     print("=" * 40)
     print(f"Platform: {platform.system()} {platform.release()}")
     print(f"Architecture: {platform.machine()}")
@@ -126,7 +132,7 @@ def main():
     total = len(checks)
     
     if passed == total:
-        print("🎉 ALL CHECKS PASSED! ChemML Suite is ready to use.")
+        print("🎉 ALL CHECKS PASSED! Chemlara Suite is ready to use.")
         print("🚀 Access your application at: http://localhost:8501")
     else:
         print(f"⚠️  {passed}/{total} checks passed. Please address the issues above.")

@@ -28,7 +28,7 @@ RDLogger.DisableLog('rdApp.*')
 
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(
-    page_title="ChemML Predictor - TPOT Classification",
+    page_title="Chemlara Predictor - TPOT Classification",
     page_icon="🧪",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -812,13 +812,13 @@ def main():
         st.session_state.selected_featurizer_name = list(Featurizer.keys())[0]  # Set default featurizer
 
     # Create main header
-    st.markdown(create_ios_header("ChemML TPOT Classifier", "Traditional AutoML for Chemical Activity Prediction"), unsafe_allow_html=True)
+    st.markdown(create_ios_header("Chemlara TPOT Classifier", "Traditional AutoML for Chemical Activity Prediction"), unsafe_allow_html=True)
 
     # Mobile-friendly navigation using tabs
     tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "🔬 Build Model", "🧪 Single Prediction", "📊 Batch Prediction"])
 
     with tab1:
-        st.markdown(create_ios_card("Welcome to ChemML Predictor!", 
+        st.markdown(create_ios_card("Welcome to Chemlara Predictor!", 
                    """
                    <p style="font-size: 16px; margin-bottom: 16px;">🎯 <strong>What can you do here?</strong></p>
                    <div style="background: rgba(0, 122, 255, 0.05); border-radius: 12px; padding: 16px; margin: 16px 0;">

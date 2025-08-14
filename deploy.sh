@@ -1,7 +1,7 @@
 #!/bin/bash
-# Deployment script for ChemML Suite on Render.com
+# Deployment script for Chemlara Suite on Render.com
 
-echo "🚀 ChemML Suite Deployment Script"
+echo "🚀 Chemlara Suite Deployment Script"
 echo "=================================="
 
 # Check Python version
@@ -21,4 +21,4 @@ python -c "import tpot; print(f'✅ TPOT {tpot.__version__}')"
 python -c "import sklearn; print(f'✅ Scikit-learn {sklearn.__version__}')"
 
 echo "✅ Deployment preparation complete!"
-echo "🌐 Starting ChemML Suite..."
+echo "🌐 Starting Chemlara Suite..."

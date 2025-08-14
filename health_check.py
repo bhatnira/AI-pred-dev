@@ -6,7 +6,7 @@ from datetime import datetime
 def health_check():
     """Simple health check for deployment verification"""
     
-    st.title("🏥 ChemML Suite Health Check")
+    st.title("🏥 Chemlara Suite Health Check")
     
     # System information
     col1, col2 = st.columns(2)

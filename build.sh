@@ -1,7 +1,6 @@
 #!/bin/bash
-
-# Render.com build script for ChemML Suite
-echo "Starting ChemML Suite build process..."
+# Render.com build script for Chemlara Suite
+echo "Starting Chemlara Suite build process..."
 
 # Check Python version
 echo "Current Python version:"

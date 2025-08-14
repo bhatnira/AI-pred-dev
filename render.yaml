@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: chemml-suite
+    name: chemlara-suite
     env: docker
     plan: free
     dockerfilePath: ./Dockerfile

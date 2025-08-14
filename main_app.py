@@ -9,7 +9,7 @@ matplotlib.use('Agg')  # Use non-interactive backend for Docker/server environme
 
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(
-    page_title="ChemML Suite",
+    page_title="Chemlara Suite",
 
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -451,7 +451,7 @@ def render_home():
     st.markdown("""
     <div class="nav-container">
         <div class="main-header">
-            <h1 class="main-title">ChemML Suite</h1>
+            <h1 class="main-title">Chemlara Suite</h1>
             <p class="main-subtitle">
                 <span class="status-indicator"></span>
                 AI Based Activity and Potency Prediction
@@ -499,7 +499,7 @@ def render_home():
     st.markdown("""
     <div class="footer">
         <p>Built with Streamlit • Powered by RDKit, DeepChem & TPOT</p>
-        <p>© 2025 ChemML Suite - Advanced Chemical Machine Learning</p>
+        <p>© 2025 Chemlara Suite - Advanced Chemical Machine Learning</p>
     </div>
     """, unsafe_allow_html=True)
 

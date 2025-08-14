@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Startup script for ChemML Suite
+Startup script for Chemlara Suite
 Handles initialization and environment setup for deployment
 """
 
@@ -69,7 +69,7 @@ def verify_packages():
 def main():
     """Main startup function"""
     
-    logger.info("🚀 Starting ChemML Suite initialization...")
+    logger.info("🚀 Starting Chemlara Suite initialization...")
     
     # Setup environment
     setup_environment()
@@ -79,7 +79,7 @@ def main():
         logger.error("❌ Package verification failed")
         sys.exit(1)
     
-    logger.info("✅ ChemML Suite initialization completed successfully")
+    logger.info("✅ Chemlara Suite initialization completed successfully")
     
     # Start the main application
     import subprocess

@@ -28,7 +28,7 @@ RDLogger.DisableLog('rdApp.*')
 
 # Configure Streamlit page for mobile-friendly display
 st.set_page_config(
-    page_title="ChemML Regressor",
+    page_title="Chemlara Regressor",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -747,13 +747,13 @@ def main():
         st.session_state.model_trained = False
 
     # Create main header
-    st.markdown(create_ios_header("ChemML Regressor", "AI-Powered Molecular Property Prediction"), unsafe_allow_html=True)
+    st.markdown(create_ios_header("Chemlara Regressor", "AI-Powered Molecular Property Prediction"), unsafe_allow_html=True)
 
     # Mobile-friendly navigation using tabs
     tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "🔬 Build Model", "🧪 Single Prediction", "📊 Batch Prediction"])
 
     with tab1:
-        st.markdown(create_ios_card("Welcome to ChemML Regressor!", 
+        st.markdown(create_ios_card("Welcome to Chemlara Regressor!", 
                    """
                    <p style="font-size: 16px; margin-bottom: 16px;">🎯 <strong>What can you do here?</strong></p>
                    <div style="background: rgba(0, 122, 255, 0.05); border-radius: 12px; padding: 16px; margin: 16px 0;">

@@ -1,4 +1,4 @@
-# 🧪 ChemML Suite - AI-Powered Chemistry Activity Prediction
+# 🧪 Chemlara Suite - AI-Powered Chemistry Activity Prediction
 
 [![Python 3.10.12](https://img.shields.io/badge/python-3.10.12-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
@@ -10,7 +10,7 @@ A comprehensive machine learning suite for chemistry activity prediction with a 
 
 ## 🐳 **Docker-First Approach**
 
-**ChemML Suite is designed to run with Docker** - no complex Python setup required!
+**Chemlara Suite is designed to run with Docker** - no complex Python setup required!
 
 - ✅ **One-command setup** - Works on Windows, macOS, and Linux
 - ✅ **No Python installation needed** - Docker handles everything
@@ -57,7 +57,7 @@ git clone https://github.com/bhatnira/AI-Activity-Prediction.git && cd AI-Activi
 
 3. **Access the application:**
    - Open your browser and go to: **http://localhost:8501**
-   - The iOS-style ChemML Suite interface will load automatically
+   - The iOS-style Chemlara Suite interface will load automatically
 
 ### 📦 Alternative: Download ZIP
 
@@ -97,7 +97,7 @@ docker-compose down -v
 
 ## 📦 Included Packages
 
-The ChemML Suite includes **116 carefully selected packages** for comprehensive chemistry and ML analysis:
+The Chemlara Suite includes **116 carefully selected packages** for comprehensive chemistry and ML analysis:
 
 ### **Core Chemistry & ML Libraries**
 - **RDKit** - Molecular informatics
@@ -147,7 +147,7 @@ The ChemML Suite includes **116 carefully selected packages** for comprehensive 
 
 ### **🐳 Docker Development** (Recommended)
 
-Docker is the **preferred way** to run ChemML Suite locally. It ensures consistent environment across all platforms and handles all dependencies automatically.
+Docker is the **preferred way** to run Chemlara Suite locally. It ensures consistent environment across all platforms and handles all dependencies automatically.
 
 #### **Quick Start with Docker:**
 ```bash
@@ -160,10 +160,10 @@ docker-compose up --build
 #### **Development Commands:**
 ```bash
 # Build the image manually
-docker build -t chemml-suite .
+docker build -t chemlara-suite .
 
 # Run with custom settings and live reload
-docker run -p 8501:8501 -v $(pwd):/app chemml-suite
+docker run -p 8501:8501 -v $(pwd):/app chemlara-suite
 
 # Run in background
 docker-compose up -d
@@ -188,8 +188,8 @@ docker-compose down
 
 1. **Create Python environment:**
    ```bash
-   python3.10 -m venv chemml_env
-   source chemml_env/bin/activate  # On Windows: chemml_env\Scripts\activate
+   python3.10 -m venv chemlara_env
+   source chemlara_env/bin/activate  # On Windows: chemlara_env\Scripts\activate
    ```
 
 2. **Install dependencies:**
@@ -229,7 +229,7 @@ AI-Activity-Prediction/
 
 ## 🎨 Interface Preview
 
-The ChemML Suite features a modern iOS-style interface with:
+The Chemlara Suite features a modern iOS-style interface with:
 - **Purple-blue gradient backgrounds**
 - **Rounded card designs**
 - **Smooth animations and transitions**
@@ -278,7 +278,7 @@ docker ps  # Look for "healthy" status
 4. **Container won't start:**
    ```bash
    # Check logs for errors
-   docker-compose logs chemml-suite
+   docker-compose logs chemlara-suite
    
    # Restart Docker Desktop and try again
    docker-compose down

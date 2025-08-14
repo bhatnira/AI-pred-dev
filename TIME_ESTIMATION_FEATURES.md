@@ -1,4 +1,4 @@
-# ChemML Predictor - Time Estimation Features
+# Chemlara Predictor - Time Estimation Features
 
 ## 🕐 New Time Estimation Features
 

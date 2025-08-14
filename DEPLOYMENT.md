@@ -1,4 +1,4 @@
-# 🚀 ChemML Suite - Render.com Deployment Checklist
+# 🚀 Chemlara Suite - Render.com Deployment Checklist
 
 ## ✅ Pre-Deployment Checklist
 
@@ -32,7 +32,7 @@
 
 # Create repository on GitHub (via web interface)
 # Then add remote and push:
-git remote add origin https://github.com/YOUR_USERNAME/chemml-suite.git
+git remote add origin https://github.com/YOUR_USERNAME/chemlara-suite.git
 git branch -M main
 git push -u origin main
 ```
@@ -109,4 +109,4 @@ The application includes:
 
 **Status**: ✅ Ready for Deployment
 
-Your ChemML Suite is fully configured and ready for deployment on Render.com!
+Your Chemlara Suite is fully configured and ready for deployment on Render.com!
