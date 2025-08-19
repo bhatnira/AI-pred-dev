@@ -47,148 +47,132 @@ st.markdown("""
         margin: 0 auto;
     }
     
-    /* iOS Navigation Bar */
+    /* Remove default Streamlit spacing */
+    .element-container {
+        margin-bottom: 0 !important;
+    }
+    
+    /* Remove gap between containers */
+    .stMarkdown {
+        margin-bottom: 0 !important;
+    }
+    
+    /* Ensure no extra spacing in columns */
+    .row-widget.stHorizontal {
+        gap: 0 !important;
+    }
+    
+    /* Header Navigation Bar */
     .nav-container {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         border-radius: 16px;
-        padding: 8px 16px;
-        margin: 4px 0 8px 0;
+        padding: 12px 20px;
+        margin: 4px 0 0 0;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
         border: 1px solid rgba(255, 255, 255, 0.3);
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
     
-    /* App Grid */
-    .app-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    /* Horizontal Navigation Bar */
+    .horizontal-nav {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 12px 16px;
+        margin: 4px 0 16px 0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+    
+    .nav-buttons {
+        display: flex;
+        justify-content: center;
         gap: 12px;
-        margin: 8px 0;
-        max-width: 1000px;
-        margin-left: auto;
-        margin-right: auto;
-        padding: 0 8px;
+        flex-wrap: wrap;
+        align-items: center;
     }
     
-    /* iOS App Card */
-    .app-card {
+    /* Navigation Button */
+    .nav-button {
         background: linear-gradient(145deg, #ffffff, #f8f9ff);
         backdrop-filter: blur(25px);
         -webkit-backdrop-filter: blur(25px);
-        border-radius: 20px;
-        padding: 16px 18px;
+        border-radius: 12px;
+        padding: 8px 16px;
         text-align: center;
-        transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         border: 1.5px solid rgba(102, 126, 234, 0.2);
-        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15), 
-                    0 1px 8px rgba(102, 126, 234, 0.08);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
         cursor: pointer;
         position: relative;
         overflow: hidden;
-        height: 120px;
+        min-width: 140px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        margin-bottom: 12px;
+        align-items: center;
+        text-decoration: none;
+        color: #2c3e50;
+        font-weight: 600;
+        font-size: 0.85rem;
+        height: 48px;
     }
     
-    .app-card:hover {
-        transform: translateY(-4px) scale(1.01);
-        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.25), 
-                    0 6px 16px rgba(102, 126, 234, 0.15),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    .nav-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.25);
         background: linear-gradient(145deg, #ffffff, #f0f4ff);
         border-color: rgba(102, 126, 234, 0.4);
+        color: #667eea;
     }
     
-    .app-card::before {
+    .nav-button::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe);
-        border-radius: 20px 20px 0 0;
-        opacity: 0.9;
-        animation: shimmer 3s ease-in-out infinite;
-    }
-    
-    @keyframes shimmer {
-        0%, 100% { opacity: 0.9; }
-        50% { opacity: 1; }
-    }
-    
-    .app-card::after {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(102, 126, 234, 0.08) 0%, rgba(240, 244, 255, 0.05) 70%);
+        height: 2px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 12px 12px 0 0;
         opacity: 0;
-        transition: opacity 0.4s ease;
-        pointer-events: none;
+        transition: opacity 0.3s ease;
     }
     
-    .app-card:hover::after {
+    .nav-button:hover::before {
         opacity: 1;
     }
     
-    /* App Title */
-    .app-title {
-        font-size: 1.1rem;
-        font-weight: 800;
+    /* Navigation Button Title */
+    .nav-button-title {
+        font-size: 0.8rem;
+        font-weight: 700;
         color: #2c3e50;
-        margin-bottom: 6px;
-        letter-spacing: -0.02em;
+        margin: 0;
+        letter-spacing: -0.01em;
         line-height: 1.1;
         transition: all 0.3s ease;
-        position: relative;
-        z-index: 2;
-        text-shadow: 0 1px 3px rgba(102, 126, 234, 0.1);
+        text-align: center;
     }
     
-    .app-card:hover .app-title {
+    .nav-button:hover .nav-button-title {
         color: #667eea;
-        transform: translateY(-1px);
-        text-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
     }
     
-    /* App Description */
-    .app-description {
-        font-size: 0.75rem;
-        color: #5a6c7d !important;
-        line-height: 1.3;
-        font-weight: 700;
-        margin: 0;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 1;
-        -webkit-box-orient: vertical;
-        transition: all 0.3s ease;
-        position: relative;
-        z-index: 2;
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-        padding: 4px 8px;
-        border-radius: 12px;
-        border: 1.5px solid rgba(102, 126, 234, 0.3);
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        text-shadow: 0 1px 2px rgba(102, 126, 234, 0.1);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-    }
-    
-    .app-card:hover .app-description {
-        color: #ffffff !important;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        border-color: #667eea;
-        transform: translateY(-2px);
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    /* Main content area */
+    .main-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        min-height: 60vh;
     }
     
     /* Header */
@@ -244,40 +228,44 @@ st.markdown("""
     
     /* Mobile responsiveness */
     @media (max-width: 768px) {
-        .app-grid {
-            grid-template-columns: 1fr;
-            gap: 12px;
-            margin: 12px 0;
+        .nav-buttons {
+            gap: 8px;
+        }
+        
+        .nav-button {
+            min-width: 120px;
+            font-size: 0.75rem;
+            padding: 6px 12px;
+            height: 42px;
+        }
+        
+        .main-content {
+            padding: 16px;
         }
         
         .main-title {
-            font-size: 2rem;
+            font-size: 1.6rem;
         }
         
         .main-subtitle {
-            font-size: 1rem;
+            font-size: 0.85rem;
         }
         
-        .app-card {
-            padding: 24px 18px;
-            height: 140px;
-            margin-bottom: 6px;
-        }
-        
-        .app-title {
-            font-size: 1.4rem;
-            font-weight: 800;
-        }
-        
-        .app-description {
-            font-size: 0.9rem;
-            padding: 7px 14px;
-            font-weight: 800;
+        .nav-button {
+            min-width: 100px;
+            font-size: 0.7rem;
+            padding: 5px 10px;
+            height: 38px;
         }
         
         .nav-container {
-            padding: 12px 16px;
-            margin: 8px 0 16px 0;
+            padding: 10px 14px;
+            margin: 6px 0 12px 0;
+        }
+        
+        .horizontal-nav {
+            padding: 8px 12px;
+            margin: 6px 0 16px 0;
         }
         
         .main .block-container {
@@ -287,23 +275,18 @@ st.markdown("""
     
     @media (max-width: 480px) {
         .main-title {
-            font-size: 1.8rem;
+            font-size: 1.4rem;
         }
         
-        .app-card {
-            height: 120px;
+        .nav-button {
+            min-width: 90px;
+            font-size: 0.65rem;
+            padding: 4px 8px;
+            height: 36px;
         }
         
-        .app-title {
-            font-size: 1.3rem;
-            font-weight: 800;
-        }
-        
-        .app-description {
-            font-size: 0.85rem;
-            color: #3a3a3c !important;
-            font-weight: 800;
-            padding: 6px 12px;
+        .nav-buttons {
+            gap: 6px;
         }
     }
     
@@ -411,6 +394,11 @@ if 'current_app' not in st.session_state:
 
 # App configurations
 apps_config = {
+    'home': {
+        'title': 'Home',
+        'description': 'Home',
+        'file': None
+    },
     'classification': {
         'title': 'AutoML Activity Prediction',
         'description': 'Classification',
@@ -423,12 +411,12 @@ apps_config = {
     },
     'graph_classification': {
         'title': 'Graph Convolution Activity Prediction',
-        'description': 'Classification',
+        'description': 'Graph Classification',
         'file': 'app_graph_classification.py'
     },
     'graph_regression': {
         'title': 'Graph Convolution Potency Prediction',
-        'description': 'Regression',
+        'description': 'Graph Regression',
         'file': 'app_graph_regression.py'
     }
 }
@@ -444,8 +432,8 @@ def load_app_module(app_file):
         st.error(f"Error loading app: {e}")
         return None
 
-def render_home():
-    """Render the home page with app selection"""
+def render_main_interface():
+    """Render the main interface with tabbed navigation"""
     
     # Header
     st.markdown("""
@@ -469,29 +457,48 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
     
-    # App grid
-    st.markdown('<div class="app-grid">', unsafe_allow_html=True)
+    # Create tabs
+    tab_labels = [app_info['description'] for app_info in apps_config.values()]
+    tabs = st.tabs(tab_labels)
     
-    # Create columns for responsive grid
-    cols = st.columns(2)
+    # Home tab
+    with tabs[0]:
+        render_home_content()
     
-    for i, (app_key, app_info) in enumerate(apps_config.items()):
-        col = cols[i % 2]
-        
-        with col:
-            # Create a clickable card container
-            st.markdown(f"""
-            <div class="app-card" style="margin-bottom: 20px;">
-                <h3 class="app-title">{app_info['title']}</h3>
-                <p class="app-description">{app_info['description']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Place the button below the card with proper spacing
-            if st.button(f"🚀 Launch {app_info['description']}", key=f"card_{app_key}", 
-                        help=f"Click to launch {app_info['title']} application"):
-                st.session_state.current_app = app_key
-                st.rerun()
+    # Classification tab
+    with tabs[1]:
+        run_individual_app('classification')
+    
+    # Regression tab  
+    with tabs[2]:
+        run_individual_app('regression')
+    
+    # Graph Classification tab
+    with tabs[3]:
+        run_individual_app('graph_classification')
+    
+    # Graph Regression tab
+    with tabs[4]:
+        run_individual_app('graph_regression')
+
+def render_home_content():
+    """Render the home page content"""
+    # Main content area
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
+    
+    # Welcome content
+    st.markdown("""
+    ### 🎯 Welcome to Chemlara Suite
+    
+    Select an application from the navigation tabs above to get started:
+    
+    - **🧬 AutoML Activity Prediction**: Classification models for molecular activity
+    - **💊 AutoML Potency Prediction**: Regression models for potency estimation  
+    - **🔗 Graph Activity Prediction**: Graph neural networks for activity classification
+    - **⚗️ Graph Potency Prediction**: Graph neural networks for potency regression
+    
+    All models are powered by advanced machine learning algorithms including TPOT AutoML and DeepChem.
+    """)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -551,13 +558,8 @@ def run_individual_app(app_key):
                 st.write(f"  • {file}")
         return
     
-    # Render header with back navigation
-    render_app_header(app_info)
-    
     # Load and execute the app
     try:
-        st.info(f"🔄 Loading {app_info['title']}...")
-        
         # Read the app file content
         with open(app_file, 'r', encoding='utf-8') as f:
             app_content = f.read()
@@ -596,8 +598,6 @@ def run_individual_app(app_key):
         # Execute the app content
         exec(modified_content, app_globals)
         
-        st.success(f"✅ {app_info['title']} loaded successfully!")
-        
     except ImportError as e:
         st.error(f"❌ Import Error: {str(e)}")
         st.info("💡 This might be due to missing dependencies in the Docker container.")
@@ -605,7 +605,6 @@ def run_individual_app(app_key):
         
     except Exception as e:
         st.error(f"❌ Error running {app_info['title']}: {str(e)}")
-        st.info("🔙 Click 'Back' to return to the main menu")
         
         # Show error details in expandable section
         with st.expander("🔍 View Error Details"):
@@ -615,10 +614,7 @@ def run_individual_app(app_key):
 
 # Main app logic
 def main():
-    if st.session_state.current_app == 'home':
-        render_home()
-    else:
-        run_individual_app(st.session_state.current_app)
+    render_main_interface()
 
 if __name__ == "__main__":
     main()
