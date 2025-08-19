@@ -41,8 +41,8 @@ st.markdown("""
     
     /* Main container */
     .main .block-container {
-        max-width: 1200px;
-        padding: 0.5rem 1rem;
+        max-width: 450px;
+        padding: 0.5rem 0.8rem;
         background: transparent;
         margin: 0 auto;
     }
@@ -169,17 +169,17 @@ st.markdown("""
     
     /* Main content area */
     .main-content {
-        max-width: 1200px;
+        max-width: 400px;
         margin: 0 auto;
-        padding: 8px 16px;
+        padding: 4px 8px;
         min-height: auto;
     }
     
     /* Home page specific styling */
     .home-content {
-        max-width: 1000px;
+        max-width: 350px;
         margin: 0 auto;
-        padding: 4px 16px 12px 16px;
+        padding: 4px 8px 8px 8px;
     }
     
     /* Header */
@@ -191,11 +191,11 @@ st.markdown("""
     /* Hero Section */
     .hero-section {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 20px;
-        padding: 32px 24px;
-        margin: 0 auto 16px auto;
-        max-width: 800px;
-        box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+        border-radius: 16px;
+        padding: 20px 32px;
+        margin: 0 auto 12px auto;
+        max-width: 900px;
+        box-shadow: 0 15px 30px rgba(102, 126, 234, 0.15);
         position: relative;
         overflow: hidden;
     }
@@ -251,7 +251,7 @@ st.markdown("""
     .subtitle-container {
         position: relative;
         z-index: 1;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
     }
     
     .main-subtitle {
@@ -565,6 +565,123 @@ st.markdown("""
     
     ::-webkit-scrollbar-thumb:hover {
         background: rgba(29, 29, 31, 0.4);
+    }
+    
+    /* Center the tabs navigation */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 12px 16px;
+        margin: 8px 0 16px 0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    /* Style individual tabs */
+    .stTabs [data-baseweb="tab"] {
+        background: linear-gradient(145deg, #ffffff, #f8f9ff);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border-radius: 12px;
+        padding: 8px 16px;
+        margin: 0 4px;
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        border: 1.5px solid rgba(102, 126, 234, 0.2);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+        min-width: 120px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #2c3e50;
+        white-space: nowrap;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.25);
+        background: linear-gradient(145deg, #ffffff, #f0f4ff);
+        border-color: rgba(102, 126, 234, 0.4);
+        color: #667eea;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(145deg, #667eea, #764ba2) !important;
+        color: white !important;
+        border-color: rgba(102, 126, 234, 0.8) !important;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+    }
+    
+    /* Mobile responsive tabs */
+    @media (max-width: 768px) {
+        .main .block-container {
+            max-width: 380px;
+            padding: 0.4rem 0.6rem;
+        }
+        
+        .main-content {
+            max-width: 350px;
+            padding: 4px 6px;
+        }
+        
+        .home-content {
+            max-width: 320px;
+            padding: 4px 6px 8px 6px;
+        }
+        
+        .hero-section {
+            max-width: 750px;
+            padding: 16px 24px;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            padding: 8px 12px;
+            margin: 4px 0 12px 0;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            min-width: 100px;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            height: 40px;
+        }
+    }
+    
+    /* Extra small mobile screens */
+    @media (max-width: 480px) {
+        .main .block-container {
+            max-width: 320px;
+            padding: 0.3rem 0.5rem;
+        }
+        
+        .main-content {
+            max-width: 300px;
+            padding: 2px 4px;
+        }
+        
+        .home-content {
+            max-width: 280px;
+            padding: 2px 4px 6px 4px;
+        }
+        
+        .hero-section {
+            max-width: 650px;
+            padding: 14px 20px;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            min-width: 80px;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            height: 36px;
+        }
     }
 </style>
 """, unsafe_allow_html=True)

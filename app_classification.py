@@ -842,15 +842,6 @@ def main():
                    </div>
                    <p style="color: #8E8E93; font-style: italic; text-align: center;">📱 Optimized for mobile and desktop use!</p>
                    """, "🎉"), unsafe_allow_html=True)
-        
-        # Quick stats or features
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(create_ios_metric_card("Featurizers", "6", "Available options", "🔧"), unsafe_allow_html=True)
-        with col2:
-            st.markdown(create_ios_metric_card("AutoML", "TPOT", "Powered by", "🤖"), unsafe_allow_html=True)
-        with col3:
-            st.markdown(create_ios_metric_card("Explainable", "LIME", "AI interpretability", "🔍"), unsafe_allow_html=True)
 
     with tab2:
         st.markdown("### 🔬 Build Your ML Model")

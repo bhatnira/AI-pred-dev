@@ -1448,7 +1448,7 @@ def main():
         uploaded_pred_file = st.file_uploader(
             "📁 Upload Excel file with SMILES for batch prediction", 
             type=["xlsx"],
-            key="batch_prediction_file"
+            key="batch_prediction_file_graph_classification"
         )
 
         if uploaded_pred_file is not None:
@@ -1467,7 +1467,7 @@ def main():
                     smiles_col = 'Smile'
                 else:
                     pred_col_names = pred_df.columns.tolist()
-                    smiles_col = st.selectbox("🧬 Select SMILES Column", pred_col_names, key='batch_smiles_column')
+                    smiles_col = st.selectbox("🧬 Select SMILES Column", pred_col_names, key='batch_smiles_column_graph_classification')
 
                 # Add option for atomic contribution maps
                 include_contrib_maps = st.checkbox(

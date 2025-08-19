@@ -1069,26 +1069,27 @@ def main():
                 
                 with col1:
                     columns = df.columns.tolist()
-                    smiles_column = st.selectbox("🧬 Select SMILES Column", columns)
-                    label_column = st.selectbox("🎯 Select Target Property Column", columns)
+                    smiles_column = st.selectbox("🧬 Select SMILES Column", columns, key="smiles_column_graph_regression")
+                    label_column = st.selectbox("🎯 Select Target Property Column", columns, key="label_column_graph_regression")
                     
                     # Log transformation option
                     log_transform = st.checkbox("📊 Apply Log10 Standardization", 
                                                value=False, 
-                                               help="Apply log10 standardization to target values (useful for IC50, Ki, binding affinity data)")
+                                               help="Apply log10 standardization to target values (useful for IC50, Ki, binding affinity data)",
+                                               key="log_transform_graph_regression")
                     
-                    batch_size = st.number_input("📦 Batch Size", min_value=32, max_value=512, value=256, step=32)
-                    dropout = st.slider("🛡️ Dropout Rate", min_value=0.0, max_value=0.5, value=0.1, step=0.05)
+                    batch_size = st.number_input("📦 Batch Size", min_value=32, max_value=512, value=256, step=32, key="batch_size_graph_regression")
+                    dropout = st.slider("🛡️ Dropout Rate", min_value=0.0, max_value=0.5, value=0.1, step=0.05, key="dropout_graph_regression")
 
                 with col2:
-                    nb_epoch = st.number_input("🔄 Number of Epochs", min_value=10, max_value=500, value=120, step=10)
-                    graph_conv_layers = st.text_input("🧠 Graph Conv Layers", value="64,64", help="Comma-separated layer sizes")
+                    nb_epoch = st.number_input("🔄 Number of Epochs", min_value=10, max_value=500, value=120, step=10, key="nb_epoch_graph_regression")
+                    graph_conv_layers = st.text_input("🧠 Graph Conv Layers", value="64,64", help="Comma-separated layer sizes", key="graph_conv_layers_regression")
                     
-                    test_size = st.slider("📊 Test Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05)
-                    valid_size = st.slider("✅ Validation Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05)
+                    test_size = st.slider("📊 Test Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05, key="test_size_graph_regression")
+                    valid_size = st.slider("✅ Validation Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05, key="valid_size_graph_regression")
 
                 # Build model button
-                if st.button("🚀 Build and Train Model", use_container_width=True):
+                if st.button("🚀 Build and Train Model", use_container_width=True, key="build_model_graph_regression"):
                     if smiles_column and label_column:
                         # Convert graph_conv_layers to list of integers
                         try:
@@ -1235,7 +1236,7 @@ def main():
                                                   key='manual_offset',
                                                   help="Offset added before log transformation (0 if no offset was used)")
                 
-                if st.button("Update Settings"):
+                if st.button("Update Settings", key="update_settings_graph_regression"):
                     st.session_state.log_transform_applied = manual_log_transform
                     st.session_state.log_transform_offset = manual_offset
                     st.success("✅ Log transformation settings updated!")
@@ -1253,10 +1254,11 @@ def main():
         smiles_input = st.text_input(
             "🧬 Enter SMILES string", 
             placeholder="e.g., CCO (ethanol)",
-            help="Enter a valid SMILES notation for the molecule you want to predict"
+            help="Enter a valid SMILES notation for the molecule you want to predict",
+            key="smiles_input_regression_predict"
         )
 
-        if st.button("🔮 Predict Property", use_container_width=True):
+        if st.button("🔮 Predict Property", use_container_width=True, key="predict_property_graph_regression"):
             if smiles_input:
                 with st.spinner("🧬 Analyzing molecule..."):
                     try:
@@ -1510,7 +1512,7 @@ def main():
         uploaded_pred_file = st.file_uploader(
             "📁 Upload Excel file with SMILES for batch prediction", 
             type=["xlsx"],
-            key="batch_prediction_file"
+            key="batch_prediction_file_graph_regression"
         )
 
         if uploaded_pred_file is not None:
@@ -1529,16 +1531,17 @@ def main():
                     smiles_col = 'Smile'
                 else:
                     pred_col_names = pred_df.columns.tolist()
-                    smiles_col = st.selectbox("🧬 Select SMILES Column", pred_col_names, key='batch_smiles_column')
+                    smiles_col = st.selectbox("🧬 Select SMILES Column", pred_col_names, key='batch_smiles_column_graph_regression')
 
                 # Add option for atomic contribution maps
                 include_contrib_maps = st.checkbox(
                     "🗺️ Include Atomic Contribution Maps", 
                     value=False,
-                    help="Generate contribution maps for each molecule (slower but more detailed)"
+                    help="Generate contribution maps for each molecule (slower but more detailed)",
+                    key="include_contrib_maps_graph_regression"
                 )
 
-                if st.button("🚀 Run Batch Prediction", use_container_width=True):
+                if st.button("🚀 Run Batch Prediction", use_container_width=True, key="run_batch_prediction_graph_regression"):
                     predictions = []
                     progress_bar = st.progress(0)
                     status_text = st.empty()
