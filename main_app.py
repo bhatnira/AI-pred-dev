@@ -699,12 +699,12 @@ apps_config = {
     },
     'classification': {
         'title': 'AutoML Activity Prediction',
-        'description': 'Classification',
+        'description': 'AutoML Classification',
         'file': 'app_classification.py'
     },
     'regression': {
         'title': 'AutoML Potency Prediction',
-        'description': 'Regression',
+        'description': 'AutoML Regression',
         'file': 'app_regression.py'
     },
     'graph_classification': {
