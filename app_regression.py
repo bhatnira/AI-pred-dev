@@ -382,14 +382,27 @@ def format_time_duration(seconds):
         return f"{hours}h {minutes}m"
 
 # Dictionary of featurizers using DeepChem
-Featurizer = {
-    "Circular Fingerprint": dc.feat.CircularFingerprint(size=2048, radius=4),
-    "MACCSKeys": dc.feat.MACCSKeysFingerprint(),
-    "modred": dc.feat.MordredDescriptors(ignore_3D=True),
-    "rdkit": dc.feat.RDKitDescriptors(),
-    "pubchem": dc.feat.PubChemFingerprint(),
-    "mol2vec": dc.feat.Mol2VecFingerprint()
-}
+def get_featurizers():
+    """Get available featurizers, handling potential initialization errors."""
+    featurizers = {
+        "Circular Fingerprint": dc.feat.CircularFingerprint(size=2048, radius=4),
+        "MACCSKeys": dc.feat.MACCSKeysFingerprint(),
+        "modred": dc.feat.MordredDescriptors(ignore_3D=True),
+        "rdkit": dc.feat.RDKitDescriptors(),
+        "pubchem": dc.feat.PubChemFingerprint(),
+    }
+    
+    # Try to add Mol2Vec, but handle pickle corruption gracefully
+    try:
+        featurizers["mol2vec"] = dc.feat.Mol2VecFingerprint()
+    except Exception as e:
+        st.warning(f"⚠️ Mol2Vec featurizer unavailable due to model loading error: {str(e)[:100]}...")
+        st.info("💡 Using alternative featurizers. Mol2Vec requires a valid pre-trained model.")
+    
+    return featurizers
+
+# Get available featurizers
+Featurizer = get_featurizers()
 
 # Function to standardize SMILES using RDKit
 def standardize_smiles(smiles, verbose=False):

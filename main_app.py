@@ -171,32 +171,160 @@ st.markdown("""
     .main-content {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 20px;
-        min-height: 60vh;
+        padding: 8px 16px;
+        min-height: auto;
+    }
+    
+    /* Home page specific styling */
+    .home-content {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 4px 16px 12px 16px;
     }
     
     /* Header */
     .main-header {
         text-align: center;
-        margin-bottom: 8px;
+        margin-bottom: 16px;
+    }
+    
+    /* Hero Section */
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
+        padding: 32px 24px;
+        margin: 0 auto 16px auto;
+        max-width: 800px;
+        box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+        pointer-events: none;
+    }
+    
+    /* Logo Container */
+    .logo-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .main-logo {
+        font-size: 3rem;
+        margin-right: 16px;
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+        animation: logoFloat 3s ease-in-out infinite;
+    }
+    
+    @keyframes logoFloat {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
     }
     
     .main-title {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #1d1d1f !important;
-        margin-bottom: 4px;
-        letter-spacing: -0.02em;
-        line-height: 1.1;
-        text-shadow: none;
+        font-size: 3rem;
+        font-weight: 800;
+        color: white !important;
+        margin: 0;
+        letter-spacing: -0.03em;
+        line-height: 1;
+        text-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        background: linear-gradient(135deg, #fff 0%, #f0f8ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    /* Subtitle Container */
+    .subtitle-container {
+        position: relative;
+        z-index: 1;
+        margin-bottom: 16px;
     }
     
     .main-subtitle {
-        font-size: 0.9rem;
-        color: #1d1d1f !important;
+        font-size: 1.2rem;
+        color: rgba(255, 255, 255, 0.95) !important;
+        font-weight: 400;
+        margin-bottom: 12px;
+        line-height: 1.4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .ai-badge {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    
+    @keyframes glow {
+        from { box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3); }
+        to { box-shadow: 0 4px 25px rgba(255, 107, 107, 0.5); }
+    }
+    
+    .subtitle-text {
         font-weight: 500;
-        margin-bottom: 8px;
-        line-height: 1.3;
+    }
+    
+    .tagline {
+        font-size: 1rem;
+        color: rgba(255, 255, 255, 0.8) !important;
+        font-weight: 400;
+        margin: 0;
+        line-height: 1.2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    
+    .tagline-icon {
+        font-size: 1.1rem;
+        animation: rocket 2s ease-in-out infinite;
+    }
+    
+    @keyframes rocket {
+        0%, 100% { transform: translateX(0px) rotate(0deg); }
+        25% { transform: translateX(2px) rotate(5deg); }
+        75% { transform: translateX(-2px) rotate(-5deg); }
+    }
+    
+    /* Gradient Line */
+    .gradient-line {
+        width: 120px;
+        height: 4px;
+        background: linear-gradient(90deg, #ff6b6b 0%, #ffd93d 50%, #6bcf7f 100%);
+        margin: 0 auto;
+        border-radius: 2px;
+        animation: shimmer 3s ease-in-out infinite;
+    }
+    
+    @keyframes shimmer {
+        0%, 100% { opacity: 0.7; transform: scaleX(1); }
+        50% { opacity: 1; transform: scaleX(1.1); }
     }
     
     /* Status indicator */
@@ -243,12 +371,35 @@ st.markdown("""
             padding: 16px;
         }
         
+        .hero-section {
+            padding: 24px 16px;
+            margin: 0 auto 12px auto;
+            border-radius: 16px;
+        }
+        
         .main-title {
-            font-size: 1.6rem;
+            font-size: 2.2rem;
+        }
+        
+        .main-logo {
+            font-size: 2.2rem;
+            margin-right: 12px;
         }
         
         .main-subtitle {
-            font-size: 0.85rem;
+            font-size: 1rem;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .tagline {
+            font-size: 0.9rem;
+        }
+        
+        .logo-container {
+            margin-bottom: 16px;
+            flex-direction: column;
+            gap: 8px;
         }
         
         .nav-button {
@@ -260,6 +411,36 @@ st.markdown("""
         
         .nav-container {
             padding: 10px 14px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .hero-section {
+            padding: 20px 12px;
+        }
+        
+        .main-title {
+            font-size: 1.8rem;
+        }
+        
+        .main-logo {
+            font-size: 1.8rem;
+            margin-right: 0;
+            margin-bottom: 8px;
+        }
+        
+        .logo-container {
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .main-subtitle {
+            font-size: 0.9rem;
+        }
+        
+        .tagline {
+            font-size: 0.8rem;
+        }
             margin: 6px 0 12px 0;
         }
         
@@ -439,20 +620,23 @@ def render_main_interface():
     st.markdown("""
     <div class="nav-container">
         <div class="main-header">
-            <h1 class="main-title">Chemlara Suite</h1>
-            <p class="main-subtitle">
-                <span class="status-indicator"></span>
-                AI Based Activity and Potency Prediction
-            </p>
-            <p style="
-                font-size: 0.8rem;
-                color: #1d1d1f !important;
-                font-weight: 400;
-                margin: 0;
-                line-height: 1.2;
-            ">
-                Modeling and Deployment
-            </p>
+            <div class="hero-section">
+                <div class="logo-container">
+                    <div class="main-logo">⚛️</div>
+                    <h1 class="main-title">Chemlara Suite</h1>
+                </div>
+                <div class="subtitle-container">
+                    <p class="main-subtitle">
+                        <span class="ai-badge">AI</span>
+                        <span class="subtitle-text">Based Activity and Potency Prediction</span>
+                    </p>
+                    <p class="tagline">
+                        <span class="tagline-icon">🚀</span>
+                        Modeling and Deployment
+                    </p>
+                </div>
+                <div class="gradient-line"></div>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -483,8 +667,8 @@ def render_main_interface():
 
 def render_home_content():
     """Render the home page content"""
-    # Main content area
-    st.markdown('<div class="main-content">', unsafe_allow_html=True)
+    # Home content area with compact spacing
+    st.markdown('<div class="home-content">', unsafe_allow_html=True)
     
     # Welcome content
     st.markdown("""
@@ -502,9 +686,9 @@ def render_home_content():
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Footer
+    # Footer with reduced spacing
     st.markdown("""
-    <div class="footer">
+    <div class="footer" style="margin-top: 8px;">
         <p>Built with Streamlit • Powered by RDKit, DeepChem & TPOT</p>
         <p>© 2025 Chemlara Suite - Advanced Chemical Machine Learning</p>
     </div>
