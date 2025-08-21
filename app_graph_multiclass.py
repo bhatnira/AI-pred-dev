@@ -440,6 +440,7 @@ def plot_training_history_multiclass(history):
     except Exception as e:
         st.error(f"❌ Error creating training history plot: {str(e)}")
         return None
+
 def create_multiclass_confusion_matrix(y_true, y_pred, class_names):
     """Create confusion matrix for multi-class classification"""
     try:
@@ -523,217 +524,6 @@ def predict_single_smiles_multiclass(model, smiles, label_encoder):
         
     except Exception as e:
         return None, None, f"Error: {str(e)}"
-
-def batch_predict_multiclass_with_contribs(model, smiles_list, label_encoder, include_contrib_maps=False):
-    """Predict activities for multiple SMILES with optional atomic contribution maps"""
-    try:
-        valid_smiles = []
-        valid_indices = []
-        
-        # Validate and standardize SMILES
-        for i, smiles in enumerate(smiles_list):
-            mol = Chem.MolFromSmiles(smiles)
-            if mol is not None:
-                standardized_smiles = Chem.MolToSmiles(mol, canonical=True)
-                valid_smiles.append(standardized_smiles)
-                valid_indices.append(i)
-        
-        if not valid_smiles:
-            return None, "No valid SMILES found"
-        
-        # Featurize
-        featurizer = ConvMolFeaturizer()
-        features = featurizer.featurize(valid_smiles)
-        
-        # Filter valid features
-        final_features = []
-        final_indices = []
-        final_smiles = []
-        
-        for i, feature in enumerate(features):
-            if feature is not None:
-                final_features.append(feature)
-                final_indices.append(valid_indices[i])
-                final_smiles.append(valid_smiles[i])
-        
-        if not final_features:
-            return None, "No valid molecular features generated"
-        
-        # Create dataset
-        dataset = dc.data.NumpyDataset(X=np.array(final_features))
-        
-        # Predict
-        pred_proba = model.predict(dataset)
-        
-        # Handle different prediction formats for multi-class with one-hot encoding
-        if len(pred_proba.shape) == 3:
-            # Handle 3D predictions from GraphConv models
-            if pred_proba.shape[2] == 1:
-                pred_proba = pred_proba.squeeze(axis=2)  # (n_samples, n_classes, 1) -> (n_samples, n_classes)
-            elif pred_proba.shape[1] == 1:
-                pred_proba = pred_proba.squeeze(axis=1)  # (n_samples, 1, n_classes) -> (n_samples, n_classes)
-            else:
-                # Fallback: take mean across tasks
-                pred_proba = np.mean(pred_proba, axis=2)
-        
-        # Ensure predictions match number of classes
-        if pred_proba.shape[1] != len(label_encoder.classes_):
-            if pred_proba.shape[1] > len(label_encoder.classes_):
-                # Truncate to match expected classes
-                pred_proba = pred_proba[:, :len(label_encoder.classes_)]
-                st.info(f"📊 Truncated prediction columns to match {len(label_encoder.classes_)} classes.")
-            else:
-                st.warning(f"⚠️ Prediction shape mismatch. Expected {len(label_encoder.classes_)} classes, got {pred_proba.shape[1]}")
-                # Create default predictions
-                pred_proba = np.random.rand(len(final_features), len(label_encoder.classes_))
-                pred_proba = pred_proba / pred_proba.sum(axis=1, keepdims=True)  # Normalize to probabilities
-        
-        pred_classes = np.argmax(pred_proba, axis=1)
-        confidences = np.max(pred_proba, axis=1)
-        
-        # Decode predictions
-        predicted_activities = label_encoder.inverse_transform(pred_classes)
-        
-        # Create results
-        results = []
-        contrib_maps = [] if include_contrib_maps else None
-        
-        for i in range(len(smiles_list)):
-            if i in final_indices:
-                idx = final_indices.index(i)
-                result = {
-                    'SMILES': smiles_list[i],
-                    'Predicted_Activity': predicted_activities[idx],
-                    'Confidence': confidences[idx]
-                }
-                
-                # Add class probabilities
-                for j, class_name in enumerate(label_encoder.classes_):
-                    result[f'Prob_{class_name}'] = pred_proba[idx, j]
-                
-                results.append(result)
-                
-                # Generate atomic contribution map if requested
-                if include_contrib_maps and RDKIT_DRAW_AVAILABLE:
-                    try:
-                        mol = Chem.MolFromSmiles(final_smiles[idx])
-                        if mol:
-                            atomic_contributions = calculate_atomic_contributions_multiclass(
-                                model, mol, final_smiles[idx], target_class=pred_classes[idx]
-                            )
-                            contrib_map = vis_contribs_multiclass(mol, atomic_contributions)
-                            contrib_maps.append(contrib_map)
-                        else:
-                            contrib_maps.append(None)
-                    except Exception as e:
-                        contrib_maps.append(None)
-                        st.warning(f"Could not generate contribution map for {smiles_list[i]}: {str(e)}")
-            else:
-                results.append({
-                    'SMILES': smiles_list[i],
-                    'Predicted_Activity': 'Invalid',
-                    'Confidence': 0.0,
-                    **{f'Prob_{class_name}': 0.0 for class_name in label_encoder.classes_}
-                })
-                if include_contrib_maps:
-                    contrib_maps.append(None)
-        
-        return results, contrib_maps, None
-        
-    except Exception as e:
-        return None, None, f"Error: {str(e)}"
-
-def batch_predict_multiclass(model, smiles_list, label_encoder):
-    """Predict activities for multiple SMILES"""
-    try:
-        valid_smiles = []
-        valid_indices = []
-        
-        # Validate and standardize SMILES
-        for i, smiles in enumerate(smiles_list):
-            mol = Chem.MolFromSmiles(smiles)
-            if mol is not None:
-                standardized_smiles = Chem.MolToSmiles(mol, canonical=True)
-                valid_smiles.append(standardized_smiles)
-                valid_indices.append(i)
-        
-        if not valid_smiles:
-            return None, "No valid SMILES found"
-        
-        # Featurize
-        featurizer = ConvMolFeaturizer()
-        features = featurizer.featurize(valid_smiles)
-        
-        # Filter valid features
-        final_features = []
-        final_indices = []
-        final_smiles = []
-        
-        for i, feature in enumerate(features):
-            if feature is not None:
-                final_features.append(feature)
-                final_indices.append(valid_indices[i])
-                final_smiles.append(valid_smiles[i])
-        
-        if not final_features:
-            return None, "No valid molecular features generated"
-        
-        # Create dataset
-        dataset = dc.data.NumpyDataset(X=np.array(final_features))
-        
-        # Predict
-        pred_proba = model.predict(dataset)
-        
-        # Handle different prediction formats for multi-class with one-hot encoding
-        if len(pred_proba.shape) == 3:
-            # Handle 3D predictions from GraphConv models
-            if pred_proba.shape[2] == 1:
-                pred_proba = pred_proba.squeeze(axis=2)  # (n_samples, n_classes, 1) -> (n_samples, n_classes)
-            elif pred_proba.shape[1] == 1:
-                pred_proba = pred_proba.squeeze(axis=1)  # (n_samples, 1, n_classes) -> (n_samples, n_classes)
-            else:
-                # Fallback: take mean across tasks
-                pred_proba = np.mean(pred_proba, axis=2)
-        
-        # Ensure predictions match number of classes
-        if pred_proba.shape[1] != len(label_encoder.classes_):
-            if pred_proba.shape[1] > len(label_encoder.classes_):
-                # Truncate to match expected classes
-                pred_proba = pred_proba[:, :len(label_encoder.classes_)]
-                st.info(f"📊 Truncated prediction columns to match {len(label_encoder.classes_)} classes.")
-            else:
-                st.warning(f"⚠️ Prediction shape mismatch. Expected {len(label_encoder.classes_)} classes, got {pred_proba.shape[1]}")
-                # Create default predictions
-                pred_proba = np.random.rand(len(final_features), len(label_encoder.classes_))
-                pred_proba = pred_proba / pred_proba.sum(axis=1, keepdims=True)  # Normalize to probabilities
-        
-        pred_classes = np.argmax(pred_proba, axis=1)
-        confidences = np.max(pred_proba, axis=1)
-        
-        # Decode predictions
-        predicted_activities = label_encoder.inverse_transform(pred_classes)
-        
-        # Create results
-        results = []
-        for i in range(len(smiles_list)):
-            if i in final_indices:
-                idx = final_indices.index(i)
-                results.append({
-                    'SMILES': smiles_list[i],
-                    'Predicted_Activity': predicted_activities[idx],
-                    'Confidence': confidences[idx]
-                })
-            else:
-                results.append({
-                    'SMILES': smiles_list[i],
-                    'Predicted_Activity': 'Invalid',
-                    'Confidence': 0.0
-                })
-        
-        return results, None
-        
-    except Exception as e:
-        return None, f"Error: {str(e)}"
 
 def calculate_atomic_contributions_multiclass(model, mol, smiles, target_class=None):
     """Calculate atomic contributions for multi-class GraphConv models"""
@@ -870,15 +660,12 @@ def vis_contribs_multiclass(mol, contributions):
         wt = {i: float(contributions[i]) for i in range(num_heavy_atoms)}
         
         # Import required modules
-        import io
         from PIL import Image
         
         # Try direct atom coloring approach (more reliable than similarity maps)
         try:
             from rdkit.Chem.Draw import rdMolDraw2D
             from rdkit.Chem import rdDepictor
-            import matplotlib.pyplot as plt
-            import matplotlib.colors as mcolors
             
             # Prepare molecule for drawing
             mol_copy = Chem.Mol(mol)
@@ -886,11 +673,6 @@ def vis_contribs_multiclass(mol, contributions):
             
             # Create drawer
             drawer = rdMolDraw2D.MolDraw2DCairo(400, 300)
-            
-            # Use actual contribution values (not normalized) for better differentiation
-            min_contrib = np.min(contributions)
-            max_contrib = np.max(contributions)
-            contrib_range = max_contrib - min_contrib
             
             # Create atom colors based on contributions
             atom_colors = {}
@@ -963,6 +745,98 @@ def vis_contribs_multiclass(mol, contributions):
         st.warning(f"Error creating atomic contribution visualization: {str(e)}")
         return Draw.MolToImage(mol, size=(400, 300)) if mol else None
 
+def batch_predict_multiclass(model, smiles_list, label_encoder):
+    """Predict activities for multiple SMILES"""
+    try:
+        valid_smiles = []
+        valid_indices = []
+        
+        # Validate and standardize SMILES
+        for i, smiles in enumerate(smiles_list):
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is not None:
+                standardized_smiles = Chem.MolToSmiles(mol, canonical=True)
+                valid_smiles.append(standardized_smiles)
+                valid_indices.append(i)
+        
+        if not valid_smiles:
+            return None, "No valid SMILES found"
+        
+        # Featurize
+        featurizer = ConvMolFeaturizer()
+        features = featurizer.featurize(valid_smiles)
+        
+        # Filter valid features
+        final_features = []
+        final_indices = []
+        final_smiles = []
+        
+        for i, feature in enumerate(features):
+            if feature is not None:
+                final_features.append(feature)
+                final_indices.append(valid_indices[i])
+                final_smiles.append(valid_smiles[i])
+        
+        if not final_features:
+            return None, "No valid molecular features generated"
+        
+        # Create dataset
+        dataset = dc.data.NumpyDataset(X=np.array(final_features))
+        
+        # Predict
+        pred_proba = model.predict(dataset)
+        
+        # Handle different prediction formats for multi-class with one-hot encoding
+        if len(pred_proba.shape) == 3:
+            # Handle 3D predictions from GraphConv models
+            if pred_proba.shape[2] == 1:
+                pred_proba = pred_proba.squeeze(axis=2)  # (n_samples, n_classes, 1) -> (n_samples, n_classes)
+            elif pred_proba.shape[1] == 1:
+                pred_proba = pred_proba.squeeze(axis=1)  # (n_samples, 1, n_classes) -> (n_samples, n_classes)
+            else:
+                # Fallback: take mean across tasks
+                pred_proba = np.mean(pred_proba, axis=2)
+        
+        # Ensure predictions match number of classes
+        if pred_proba.shape[1] != len(label_encoder.classes_):
+            if pred_proba.shape[1] > len(label_encoder.classes_):
+                # Truncate to match expected classes
+                pred_proba = pred_proba[:, :len(label_encoder.classes_)]
+                st.info(f"📊 Truncated prediction columns to match {len(label_encoder.classes_)} classes.")
+            else:
+                st.warning(f"⚠️ Prediction shape mismatch. Expected {len(label_encoder.classes_)} classes, got {pred_proba.shape[1]}")
+                # Create default predictions
+                pred_proba = np.random.rand(len(final_features), len(label_encoder.classes_))
+                pred_proba = pred_proba / pred_proba.sum(axis=1, keepdims=True)  # Normalize to probabilities
+        
+        pred_classes = np.argmax(pred_proba, axis=1)
+        confidences = np.max(pred_proba, axis=1)
+        
+        # Decode predictions
+        predicted_activities = label_encoder.inverse_transform(pred_classes)
+        
+        # Create results
+        results = []
+        for i in range(len(smiles_list)):
+            if i in final_indices:
+                idx = final_indices.index(i)
+                results.append({
+                    'SMILES': smiles_list[i],
+                    'Predicted_Activity': predicted_activities[idx],
+                    'Confidence': confidences[idx]
+                })
+            else:
+                results.append({
+                    'SMILES': smiles_list[i],
+                    'Predicted_Activity': 'Invalid',
+                    'Confidence': 0.0
+                })
+        
+        return results, None
+        
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
 # Main function to run the Streamlit app
 def main():
     # Create iOS-style header
@@ -990,6 +864,7 @@ def main():
             st.markdown("• **Multi-Class Classification** - Handle multiple activity classes")
             st.markdown("• **Interactive Predictions** - Single molecule analysis")
             st.markdown("• **Batch Processing** - Analyze multiple compounds")
+            st.markdown("• **Atomic Contribution Maps** - Visualize molecular insights")
         
         with col2:
             st.markdown("### 📊 Model Capabilities")
@@ -997,6 +872,7 @@ def main():
             st.markdown("• **Confusion Matrix** - Classification breakdown")
             st.markdown("• **Confidence Scores** - Prediction reliability")
             st.markdown("• **SMILES Validation** - Chemical structure checks")
+            st.markdown("• **Training Visualization** - Loss and accuracy curves")
 
     with tab2:
         st.markdown("## 🔬 Build Multi-Class Model")
@@ -1031,7 +907,7 @@ def main():
                 
                 with col1:
                     batch_size = st.number_input("📦 Batch Size", min_value=32, max_value=512, value=256, step=32)
-                    dropout = st.slider("�️ Dropout Rate", min_value=0.0, max_value=0.5, value=0.1, step=0.05)
+                    dropout = st.slider("🎛️ Dropout Rate", min_value=0.0, max_value=0.5, value=0.1, step=0.05)
                     graph_conv_layers = st.text_input("🧠 Graph Conv Layers", value="64,64", help="Comma-separated layer sizes")
 
                 with col2:
@@ -1272,20 +1148,11 @@ def main():
                         with st.spinner('🔄 Processing batch predictions...'):
                             smiles_list = batch_df[smiles_col].tolist()
                             
-                            if include_contrib_maps:
-                                results, contrib_maps, error = batch_predict_multiclass_with_contribs(
-                                    st.session_state.multiclass_model,
-                                    smiles_list,
-                                    st.session_state.multiclass_label_encoder,
-                                    include_contrib_maps=True
-                                )
-                            else:
-                                results, error = batch_predict_multiclass(
-                                    st.session_state.multiclass_model,
-                                    smiles_list,
-                                    st.session_state.multiclass_label_encoder
-                                )
-                                contrib_maps = None
+                            results, error = batch_predict_multiclass(
+                                st.session_state.multiclass_model,
+                                smiles_list,
+                                st.session_state.multiclass_label_encoder
+                            )
                             
                             if error:
                                 st.error(f"❌ {error}")
@@ -1308,30 +1175,6 @@ def main():
                                     mime="text/csv",
                                     use_container_width=True
                                 )
-                                
-                                # Display atomic contribution maps if generated
-                                if include_contrib_maps and contrib_maps:
-                                    st.markdown("### 🗺️ Atomic Contribution Maps")
-                                    st.markdown("*Red areas indicate high contribution to prediction, blue areas indicate low contribution*")
-                                    
-                                    # Display maps in a grid
-                                    valid_maps = [(i, results[i], map_img) for i, map_img in enumerate(contrib_maps) if map_img is not None]
-                                    
-                                    if valid_maps:
-                                        # Show maps in rows of 3
-                                        for i in range(0, len(valid_maps), 3):
-                                            cols = st.columns(3)
-                                            for j, col in enumerate(cols):
-                                                if i + j < len(valid_maps):
-                                                    idx, result, map_img = valid_maps[i + j]
-                                                    with col:
-                                                        st.image(
-                                                            map_img, 
-                                                            caption=f"SMILES {idx+1}: {result['Predicted_Activity']} ({result['Confidence']:.3f})",
-                                                            use_column_width=True
-                                                        )
-                                    else:
-                                        st.info("No valid contribution maps could be generated.")
                                 
                                 # Summary statistics
                                 valid_predictions = results_df[results_df['Predicted_Activity'] != 'Invalid']
