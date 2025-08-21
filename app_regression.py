@@ -392,12 +392,8 @@ def get_featurizers():
         "pubchem": dc.feat.PubChemFingerprint(),
     }
     
-    # Try to add Mol2Vec, but handle pickle corruption gracefully
-    try:
-        featurizers["mol2vec"] = dc.feat.Mol2VecFingerprint()
-    except Exception as e:
-        st.warning(f"⚠️ Mol2Vec featurizer unavailable due to model loading error: {str(e)[:100]}...")
-        st.info("💡 Using alternative featurizers. Mol2Vec requires a valid pre-trained model.")
+    # Skip Mol2Vec due to model corruption issues - using robust alternative featurizers
+    # This provides reliable molecular representations without dependency on external model files
     
     return featurizers
 

@@ -702,6 +702,11 @@ apps_config = {
         'description': 'AutoML Classification',
         'file': 'app_classification.py'
     },
+    'classification_multiple': {
+        'title': 'AutoML Multi-Class Prediction',
+        'description': 'Multi-Class AutoML',
+        'file': 'app_classification_multiple.py'
+    },
     'regression': {
         'title': 'AutoML Potency Prediction',
         'description': 'AutoML Regression',
@@ -711,6 +716,11 @@ apps_config = {
         'title': 'Graph Convolution Activity Prediction',
         'description': 'Graph Classification',
         'file': 'app_graph_classification.py'
+    },
+    'graph_multiclass': {
+        'title': 'Graph Multi-Class Prediction',
+        'description': 'Graph Multi-Class',
+        'file': 'app_graph_multiclass.py'
     },
     'graph_regression': {
         'title': 'Graph Convolution Potency Prediction',
@@ -770,16 +780,24 @@ def render_main_interface():
     with tabs[1]:
         run_individual_app('classification')
     
-    # Regression tab  
+    # Multi-Class AutoML tab
     with tabs[2]:
+        run_individual_app('classification_multiple')
+    
+    # Regression tab  
+    with tabs[3]:
         run_individual_app('regression')
     
     # Graph Classification tab
-    with tabs[3]:
+    with tabs[4]:
         run_individual_app('graph_classification')
     
+    # Graph Multi-Class tab
+    with tabs[5]:
+        run_individual_app('graph_multiclass')
+    
     # Graph Regression tab
-    with tabs[4]:
+    with tabs[6]:
         run_individual_app('graph_regression')
 
 def render_home_content():
@@ -793,9 +811,11 @@ def render_home_content():
     
     Select an application from the navigation tabs above to get started:
     
-    - **🧬 AutoML Activity Prediction**: Classification models for molecular activity
+    - **🧬 AutoML Activity Prediction**: Binary classification models for molecular activity
+    - **🎨 AutoML Multi-Class Prediction**: Multi-class classification for complex activity categories
     - **💊 AutoML Potency Prediction**: Regression models for potency estimation  
-    - **🔗 Graph Activity Prediction**: Graph neural networks for activity classification
+    - **🔗 Graph Activity Prediction**: Graph neural networks for binary activity classification
+    - **🔥 Graph Multi-Class Prediction**: Graph neural networks for multi-class activity prediction
     - **⚗️ Graph Potency Prediction**: Graph neural networks for potency regression
     
     All models are powered by advanced machine learning algorithms including TPOT AutoML and DeepChem.
