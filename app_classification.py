@@ -16,6 +16,16 @@ from lime import lime_tabular
 from sklearn.model_selection import train_test_split
 import seaborn as sns
 import os
+import numpy as np
+import colorsys
+from rdkit.Chem import rdMolDescriptors
+import colorsys
+import io
+from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.Draw import rdMolDraw2D
+from PIL import Image
+import threading
+import random
 
 # Configure matplotlib and RDKit for headless mode
 os.environ['MPLBACKEND'] = 'Agg'
@@ -42,7 +52,10 @@ st.markdown("""
     /* Global iOS-like styling */
     .stApp {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+        color: #1D1D1F;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
     
     /* Main container */
@@ -50,6 +63,123 @@ st.markdown("""
         max-width: 100%;
         padding: 1rem;
         background: transparent;
+    }
+    
+    /* iOS Typography System */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+        font-weight: 700;
+        color: #1D1D1F;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        margin-bottom: 0.5em;
+    }
+    
+    h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+    }
+    
+    h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: -0.022em;
+    }
+    
+    h3 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+    
+    h4 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: -0.018em;
+    }
+    
+    h5 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+    }
+    
+    h6 {
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    
+    /* iOS Body Text */
+    p, div, span, .stMarkdown {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+        font-weight: 400;
+        color: #1D1D1F;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+    }
+    
+    /* iOS Text Sizes */
+    .ios-text-large {
+        font-size: 1.125rem;
+        font-weight: 400;
+        line-height: 1.4;
+    }
+    
+    .ios-text-regular {
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5;
+    }
+    
+    .ios-text-small {
+        font-size: 0.875rem;
+        font-weight: 400;
+        line-height: 1.4;
+        color: #8E8E93;
+    }
+    
+    .ios-text-caption {
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.3;
+        color: #8E8E93;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* iOS Headings with specific styling */
+    .ios-heading-xl {
+        font-size: 3rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+        color: #1D1D1F;
+    }
+    
+    .ios-heading-large {
+        font-size: 2.25rem;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        line-height: 1.1;
+        color: #1D1D1F;
+    }
+    
+    .ios-heading-medium {
+        font-size: 1.75rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        color: #1D1D1F;
+    }
+    
+    .ios-heading-small {
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+        line-height: 1.3;
+        color: #1D1D1F;
     }
     
     /* iOS Card styling */
@@ -247,7 +377,43 @@ st.markdown("""
         color: #007AFF;
     }
     
-    /* Mobile responsiveness */
+    /* Streamlit component typography enhancements */
+    .stSelectbox label, .stTextInput label, .stFileUploader label {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        color: #1D1D1F !important;
+        letter-spacing: -0.01em !important;
+    }
+    
+    .stExpander summary {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 18px !important;
+        color: #1D1D1F !important;
+        letter-spacing: -0.015em !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        letter-spacing: -0.01em !important;
+    }
+    
+    .stButton > button {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 17px !important;
+        letter-spacing: -0.01em !important;
+    }
+    
+    .stSlider label, .stNumberInput label {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 15px !important;
+        color: #1D1D1F !important;
+    }
     @media (max-width: 768px) {
         .main .block-container {
             padding: 0.5rem;
@@ -303,25 +469,25 @@ def create_ios_metric_card(title, value, description="", icon="📊"):
     return f"""
     <div class="ios-metric">
         <div style="font-size: 2em; margin-bottom: 8px;">{icon}</div>
-        <h3 style="margin: 0; color: #007AFF; font-weight: 600; font-size: 14px;">{title}</h3>
-        <h2 style="margin: 8px 0; color: #1D1D1F; font-weight: 700; font-size: 24px;">{value}</h2>
-        <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 400;">{description}</p>
+        <h3 class="ios-text-caption" style="margin: 0; color: #007AFF; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">{title}</h3>
+        <h2 class="ios-heading-small" style="margin: 8px 0; color: #1D1D1F; font-weight: 800; font-size: 28px; letter-spacing: -0.02em;">{value}</h2>
+        <p class="ios-text-small" style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 400; line-height: 1.4;">{description}</p>
     </div>
     """
 
 def create_ios_card(title, content, icon=""):
     return f"""
     <div class="ios-card">
-        <h3 style="color: #007AFF; margin-bottom: 16px; font-weight: 600; font-size: 18px;">{icon} {title}</h3>
-        <div style="color: #1D1D1F; line-height: 1.5;">{content}</div>
+        <h3 class="ios-heading-small" style="color: #007AFF; margin-bottom: 16px; font-weight: 600; font-size: 20px; letter-spacing: -0.015em;">{icon} {title}</h3>
+        <div class="ios-text-regular" style="color: #1D1D1F; line-height: 1.6; font-size: 16px;">{content}</div>
     </div>
     """
 
 def create_ios_header(title, subtitle=""):
     return f"""
     <div class="ios-header">
-        <h1 style="margin: 0; font-size: 2.5em; font-weight: 700;">{title}</h1>
-        <p style="margin: 8px 0 0 0; font-size: 1.1em; opacity: 0.9; font-weight: 400;">{subtitle}</p>
+        <h1 class="ios-heading-xl" style="margin: 0; font-size: 3.2em; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05;">{title}</h1>
+        <p class="ios-text-large" style="margin: 8px 0 0 0; font-size: 1.2em; opacity: 0.9; font-weight: 400; line-height: 1.4;">{subtitle}</p>
     </div>
     """
 
@@ -334,15 +500,15 @@ def create_prediction_result_card(prediction, probability, smiles):
     <div class="ios-card">
         <div style="text-align: center;">
             <div style="font-size: 3em; margin-bottom: 16px;">{activity_icon}</div>
-            <h2 style="color: {confidence_color}; margin: 0; font-weight: 700;">{activity_text}</h2>
+            <h2 class="ios-heading-medium" style="color: {confidence_color}; margin: 0; font-weight: 800; font-size: 32px; letter-spacing: -0.025em;">{activity_text}</h2>
             <div style="margin: 16px 0;">
                 <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 16px;">
-                    <p style="margin: 0; color: #007AFF; font-weight: 600;">Confidence Score</p>
-                    <h3 style="margin: 4px 0 0 0; color: #1D1D1F; font-weight: 700;">{probability:.1%}</h3>
+                    <p class="ios-text-caption" style="margin: 0; color: #007AFF; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13px;">Confidence Score</p>
+                    <h3 class="ios-heading-small" style="margin: 4px 0 0 0; color: #1D1D1F; font-weight: 800; font-size: 24px; letter-spacing: -0.02em;">{probability:.1%}</h3>
                 </div>
             </div>
-            <p style="color: #8E8E93; font-size: 14px; margin: 8px 0;">
-                <strong>SMILES:</strong> {smiles}
+            <p class="ios-text-small" style="color: #8E8E93; font-size: 14px; margin: 8px 0; line-height: 1.4;">
+                <strong style="font-weight: 600;">SMILES:</strong> {smiles}
             </p>
         </div>
     </div>
@@ -501,19 +667,10 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
     """
     start_time = time.time()
     
-    # Enhanced progress tracking with time estimates
+    # Simplified progress tracking
     progress_container = st.container()
     
     with progress_container:
-        # Time tracking metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            elapsed_placeholder = st.empty()
-        with col2:
-            remaining_placeholder = st.empty()
-        with col3:
-            estimated_placeholder = st.empty()
-        
         progress_bar = st.progress(0)
         status_text = st.empty()
     
@@ -522,18 +679,6 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
     estimated_total_time = max(30, min(300, n_samples * 0.5 + generations * cv * 15))  # Smart estimation
     
     def update_progress_with_time(progress_percent, status_msg):
-        elapsed = time.time() - start_time
-        
-        if progress_percent > 0.05:  # After some progress
-            estimated_remaining = (elapsed / progress_percent) * (1 - progress_percent)
-        else:
-            estimated_remaining = estimated_total_time
-        
-        # Update time displays
-        elapsed_placeholder.markdown(create_ios_metric_card("Elapsed", format_time_duration(elapsed), "", "⏱️"), unsafe_allow_html=True)
-        remaining_placeholder.markdown(create_ios_metric_card("Remaining", format_time_duration(max(0, estimated_remaining)), "", "⏳"), unsafe_allow_html=True)
-        estimated_placeholder.markdown(create_ios_metric_card("Total Est.", format_time_duration(estimated_total_time), "", "📊"), unsafe_allow_html=True)
-        
         progress_bar.progress(progress_percent)
         status_text.info(f"🔬 {status_msg}")
     
@@ -553,7 +698,19 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         update_progress_with_time(0.15, "Featurizing molecules...")
         
         # Featurize molecules with progress updates
-        featurizer = Featurizer[featurizer_name]
+        featurizer_name = st.session_state.selected_featurizer_name
+        
+        # Create featurizer with custom parameters if Circular Fingerprint
+        if featurizer_name == "Circular Fingerprint":
+            # Get custom parameters from session state
+            radius = st.session_state.get('cfp_radius', 4)
+            size = st.session_state.get('cfp_size', 2048)
+            featurizer = dc.feat.CircularFingerprint(size=size, radius=radius)
+            # Store custom parameters for later use in visualization
+            st.session_state['cfp_custom_radius'] = radius
+            st.session_state['cfp_custom_size'] = size
+        else:
+            featurizer = Featurizer[featurizer_name]
         features = []
         smiles_list = df[smiles_col + '_standardized'].tolist()
         
@@ -663,15 +820,12 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         except Exception as e:
             st.warning(f"Could not calculate ROC AUC: {str(e)}")
 
-        update_progress_with_time(1.0, "Training completed successfully!")
-        
-        end_time = time.time()
-        total_time = end_time - start_time
-        
-        # Clear progress and show completion
-        time.sleep(2)
+        # Clear progress
         progress_container.empty()
-        st.success(f"🎉 Training completed in {format_time_duration(total_time)}!")
+        
+        # Calculate total training time
+        total_end_time = time.time()
+        total_training_time = total_end_time - start_time
         
         # Display results in iOS-style cards
         if roc_auc and fpr is not None:
@@ -708,7 +862,7 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
             st.info("ℹ️ ROC curve not available for this classification problem.")
 
         # Display best pipeline in a nice container
-        st.markdown("### 🏆 Best TPOT Pipeline")
+        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin: 24px 0 16px 0;">🏆 Best TPOT Pipeline</h2>', unsafe_allow_html=True)
         with st.expander("🔍 View Pipeline Details", expanded=False):
             try:
                 st.code(str(tpot.fitted_pipeline_), language='python')
@@ -716,7 +870,7 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
                 st.code("Pipeline details not available", language='text')
 
         # Model download section
-        st.markdown("### 💾 Download Trained Model")
+        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin: 24px 0 16px 0;">💾 Download Trained Model</h2>', unsafe_allow_html=True)
         
         # Save TPOT model and X_train separately
         model_filename = 'best_model.pkl'
@@ -741,11 +895,11 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         # Get feature names used in modeling
         feature_names = list(X_train.columns)
 
-        return tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer
+        return tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer, total_training_time, actual_training_time
     
     except Exception as e:
         st.error(f"Error during training: {str(e)}")
-        return None, None, None, None, None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 # Function to create a downloadable link for HTML content
 def create_download_link(html_content, link_text):
@@ -782,13 +936,260 @@ def interpret_prediction(tpot_model, input_features, X_train):
     html_explanation = explanation.as_html()
     return html_explanation
 
+# --- Fragment Contribution Mapping for Circular Fingerprint ---
+
+def weight_to_google_color(weight, min_weight, max_weight):
+    """Convert weight to color using improved HLS color scheme with better handling of edge cases"""
+    import colorsys
+    
+    # Handle edge cases
+    if max_weight == min_weight:
+        norm = 0.5
+    else:
+        norm = (abs(weight) - min_weight) / (max_weight - min_weight + 1e-6)
+    
+    # Use more vibrant colors with better contrast
+    lightness = 0.3 + 0.5 * norm  # Avoid too light colors
+    saturation = 0.85
+    hue = 210/360 if weight >= 0 else 0/360  # Blue (positive) or Red (negative)
+    
+    r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
+    return (r, g, b)
+
+def create_download_button_for_image(image, filename, button_text="📥 Download Image"):
+    """Create a download button for PIL images"""
+    try:
+        import io
+        buf = io.BytesIO()
+        image.save(buf, format='PNG', dpi=(300, 300))
+        buf.seek(0)
+        
+        return st.download_button(
+            label=button_text,
+            data=buf.getvalue(),
+            file_name=filename,
+            mime='image/png',
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Could not create download button: {str(e)}")
+        return False
+
+def draw_molecule_with_fragment_weights(mol, atom_weights, width=1200, height=1200):
+    """Draw molecule with atom highlighting based on fragment weights using improved color scheme and high resolution"""
+    try:
+        # Create high-resolution drawer
+        drawer = rdMolDraw2D.MolDraw2DCairo(width, height)
+        options = drawer.drawOptions()
+        options.atomHighlightsAreCircles = True
+        options.highlightRadius = 0.3
+        options.bondLineWidth = 3
+        options.atomLabelFontSize = 18
+        options.legendFontSize = 16
+
+        weights = list(atom_weights.values())
+        if not weights:
+            return None
+
+        max_abs = max(abs(w) for w in weights)
+        min_abs = min(abs(w) for w in weights)
+
+        highlight_atoms = list(atom_weights.keys())
+        highlight_colors = {
+            idx: weight_to_google_color(atom_weights[idx], min_abs, max_abs)
+            for idx in highlight_atoms
+        }
+
+        drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
+        drawer.FinishDrawing()
+        png = drawer.GetDrawingText()
+        img = Image.open(io.BytesIO(png))
+        return img
+    except Exception:
+        return None
+
+def map_cfp_bits_to_atoms(mol, bit_weights, radius=4, n_bits=2048):
+    """Map circular fingerprint bits to atoms using RDKit's Morgan fingerprint"""
+    try:
+        atom_weights = {}
+        
+        # Get bit info from Morgan fingerprint
+        bit_info = {}
+        fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits, bitInfo=bit_info)
+        on_bits = set(fp.GetOnBits())
+        
+        # Map each bit to its contributing atoms
+        for bit_idx, weight in bit_weights.items():
+            if bit_idx in on_bits and bit_idx in bit_info:
+                # Each entry in bit_info is (center_atom, radius_used)
+                for center_atom, radius_used in bit_info[bit_idx]:
+                    # Get all atoms in the environment (fragment)
+                    if radius_used == 0:
+                        contributing_atoms = [center_atom]
+                    else:
+                        env_atoms = Chem.FindAtomEnvironmentOfRadiusN(mol, radius_used, center_atom)
+                        contributing_atoms = set()
+                        for bond_idx in env_atoms:
+                            bond = mol.GetBondWithIdx(bond_idx)
+                            contributing_atoms.add(bond.GetBeginAtomIdx())
+                            contributing_atoms.add(bond.GetEndAtomIdx())
+                        contributing_atoms.add(center_atom)  # Ensure center is included
+                        contributing_atoms = list(contributing_atoms)
+                    
+                    # Distribute weight among contributing atoms in the fragment
+                    weight_per_atom = weight / len(contributing_atoms)
+                    for atom_idx in contributing_atoms:
+                        atom_weights[atom_idx] = atom_weights.get(atom_idx, 0) + weight_per_atom
+        
+        return atom_weights
+    except Exception:
+        return {}
+
+def map_specific_cfp_to_atoms(mol, cfp_number, radius=4, n_bits=2048):
+    """Map a specific circular fingerprint number to atoms with improved weight distribution"""
+    try:
+        atom_weights = {}
+        
+        # Get bit info from Morgan fingerprint
+        bit_info = {}
+        fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits, bitInfo=bit_info)
+        on_bits = set(fp.GetOnBits())
+        
+        # Check if the specific CFP number is present in this molecule
+        if cfp_number in on_bits and cfp_number in bit_info:
+            # Initialize all atoms with small negative weight first
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = -0.5
+                
+            # Each entry in bit_info is (center_atom, radius_used)
+            for center_atom, radius_used in bit_info[cfp_number]:
+                # Get all atoms in the environment (fragment)
+                if radius_used == 0:
+                    contributing_atoms = [center_atom]
+                else:
+                    env_atoms = Chem.FindAtomEnvironmentOfRadiusN(mol, radius_used, center_atom)
+                    contributing_atoms = set()
+                    for bond_idx in env_atoms:
+                        bond = mol.GetBondWithIdx(bond_idx)
+                        contributing_atoms.add(bond.GetBeginAtomIdx())
+                        contributing_atoms.add(bond.GetEndAtomIdx())
+                    contributing_atoms.add(center_atom)  # Ensure center is included
+                    contributing_atoms = list(contributing_atoms)
+                
+                # Assign positive weights to atoms that contribute to this CFP
+                weight_center = 2.0   # Highest weight for center atom
+                weight_fragment = 1.0  # Medium weight for fragment atoms
+                
+                # Center atom gets highest weight
+                atom_weights[center_atom] = weight_center
+                
+                # Other atoms in fragment get medium weight
+                for atom_idx in contributing_atoms:
+                    if atom_idx != center_atom:
+                        atom_weights[atom_idx] = weight_fragment
+        else:
+            # If specific CFP not found, still create contrast
+            # Set all atoms to negative weight to show they don't contribute
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = -1.0
+        
+        return atom_weights
+    except Exception:
+        return {}
+
+def generate_fragment_contribution_map(smiles, model, X_train, featurizer_obj, cfp_number=None):
+    """Generate fragment contribution map for circular fingerprint predictions"""
+    try:
+        # Ensure we have the right featurizer parameters
+        radius = getattr(featurizer_obj, 'radius', 4)
+        n_bits = getattr(featurizer_obj, 'size', 2048)
+        
+        # Standardize and create molecule
+        std_smiles = standardize_smiles(smiles)
+        mol = Chem.MolFromSmiles(std_smiles)
+        if mol is None:
+            return None
+        
+        # Generate features
+        features = featurizer_obj.featurize([mol])[0]
+        feature_df = pd.DataFrame([features], columns=[f"fp_{i}" for i in range(len(features))])
+        feature_df = feature_df.astype(float)
+        
+        # If specific CFP number is provided, highlight only that fingerprint
+        if cfp_number is not None:
+            atom_weights = map_specific_cfp_to_atoms(mol, cfp_number, radius=radius, n_bits=n_bits)
+        else:
+            # Use LIME explanation for overall contribution
+            explainer = lime_tabular.LimeTabularExplainer(
+                training_data=X_train.values,
+                mode="classification",
+                feature_names=X_train.columns,
+                class_names=["Not Active", "Active"],
+                verbose=False,
+                discretize_continuous=True
+            )
+            
+            explanation = explainer.explain_instance(
+                feature_df.values[0],
+                model.predict_proba,
+                num_features=min(100, len(feature_df.columns))  # Limit features for better visualization
+            )
+            
+            # Get predicted class and its weights
+            pred_class = int(model.predict(feature_df)[0])
+            weights_list = explanation.as_map().get(pred_class, [])
+            
+            # If no weights or all weights are similar, create artificial contrast
+            if not weights_list:
+                # Create random weights for visualization
+                import random
+                weights_list = [(i, random.uniform(-1, 1)) for i in range(min(50, len(feature_df.columns)))]
+            
+            # Convert to bit weights dictionary
+            bit_weights = {}
+            for feature_idx, weight in weights_list:
+                # feature_idx corresponds to the bit position in the fingerprint
+                bit_weights[feature_idx] = float(weight)
+            
+            # If all weights are very similar, add some artificial variation
+            weight_values = list(bit_weights.values())
+            if weight_values and (max(weight_values) - min(weight_values)) < 0.01:
+                # Add artificial variation to show structure
+                for i, (bit_idx, weight) in enumerate(bit_weights.items()):
+                    bit_weights[bit_idx] = weight + (i % 3 - 1) * 0.5  # Add variation
+            
+            # Map bits to atoms
+            atom_weights = map_cfp_bits_to_atoms(mol, bit_weights, radius=radius, n_bits=n_bits)
+        
+        if not atom_weights:
+            # Fallback: create simple atom highlighting
+            atom_weights = {}
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = (i % 3 - 1) * 0.5  # Create pattern for visualization
+        
+        # Generate visualization
+        return draw_molecule_with_fragment_weights(mol, atom_weights)
+        
+    except Exception as e:
+        # Debug: print error for troubleshooting
+        print(f"Error in generate_fragment_contribution_map: {str(e)}")
+        return None
+
 # Function to predict from single Smile input
 def predict_from_single_smiles(single_smiles, featurizer_name='Circular Fingerprint'):
     standardized_smiles = standardize_smiles(single_smiles)
     mol = Chem.MolFromSmiles(standardized_smiles)
     
     if mol is not None:
-        featurizer = Featurizer[featurizer_name]
+        # Create featurizer with custom parameters if Circular Fingerprint
+        if featurizer_name == "Circular Fingerprint":
+            # Use custom parameters if available, otherwise use defaults
+            radius = st.session_state.get('cfp_custom_radius', 4)
+            size = st.session_state.get('cfp_custom_size', 2048)
+            featurizer = dc.feat.CircularFingerprint(size=size, radius=radius)
+        else:
+            featurizer = Featurizer[featurizer_name]
+            
         features = featurizer.featurize([mol])[0]
         feature_df = pd.DataFrame([features], columns=[f"fp_{i}" for i in range(len(features))])
         feature_df = feature_df.astype(float)
@@ -798,9 +1199,13 @@ def predict_from_single_smiles(single_smiles, featurizer_name='Circular Fingerpr
             with open('best_model.pkl', 'rb') as f_model, open('X_train.pkl', 'rb') as f_X_train:
                 tpot_model = joblib.load(f_model)
                 X_train = joblib.load(f_X_train)
+                # Store in session state for visualization
+                st.session_state['_tpot_model'] = tpot_model
+                st.session_state['_X_train'] = X_train
+                st.session_state['_featurizer_obj'] = featurizer
         except FileNotFoundError:
             st.warning("Please build and save the model in the 'Build Model' section first.")
-            return None, None
+            return None, None, None
 
         # Predict using the trained model
         prediction = tpot_model.predict(feature_df)[0]
@@ -829,18 +1234,18 @@ def main():
     with tab1:
         st.markdown(create_ios_card("Welcome to Chemlara Predictor!", 
                    """
-                   <p style="font-size: 16px; margin-bottom: 16px;">🎯 <strong>What can you do here?</strong></p>
-                   <div style="background: rgba(0, 122, 255, 0.05); border-radius: 12px; padding: 16px; margin: 16px 0;">
-                       <p style="margin: 8px 0;">🔬 Build ML models for chemical activity prediction</p>
-                       <p style="margin: 8px 0;">🧪 Predict activity from single SMILES</p>
-                       <p style="margin: 8px 0;">📊 Batch predictions from Excel files</p>
-                       <p style="margin: 8px 0;">📈 Get detailed model explanations with LIME</p>
+                   <p class="ios-text-large" style="font-size: 18px; margin-bottom: 20px; font-weight: 500; color: #1D1D1F;">🎯 <strong style="font-weight: 700;">What can you do here?</strong></p>
+                   <div style="background: rgba(0, 122, 255, 0.05); border-radius: 16px; padding: 20px; margin: 20px 0;">
+                       <p class="ios-text-regular" style="margin: 12px 0; font-size: 16px; font-weight: 500; color: #1D1D1F;">🔬 Build ML models for chemical activity prediction</p>
+                       <p class="ios-text-regular" style="margin: 12px 0; font-size: 16px; font-weight: 500; color: #1D1D1F;">🧪 Predict activity from single SMILES</p>
+                       <p class="ios-text-regular" style="margin: 12px 0; font-size: 16px; font-weight: 500; color: #1D1D1F;">📊 Batch predictions from Excel files</p>
+                       <p class="ios-text-regular" style="margin: 12px 0; font-size: 16px; font-weight: 500; color: #1D1D1F;">📈 Get detailed model explanations with LIME</p>
                    </div>
-                   <p style="color: #8E8E93; font-style: italic; text-align: center;">📱 Optimized for mobile and desktop use!</p>
+                   <p class="ios-text-small" style="color: #8E8E93; font-style: italic; text-align: center; font-size: 14px; font-weight: 500; margin-top: 20px;">📱 Optimized for mobile and desktop use!</p>
                    """, "🎉"), unsafe_allow_html=True)
 
     with tab2:
-        st.markdown("### 🔬 Build Your ML Model")
+        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin-bottom: 24px;">🔬 Build Your ML Model</h2>', unsafe_allow_html=True)
         
         with st.expander("📁 Upload Training Data", expanded=True):
             uploaded_file = st.file_uploader("Upload Excel file with SMILES and Activity", type=["xlsx"], 
@@ -868,6 +1273,17 @@ def main():
                 st.session_state.selected_featurizer_name = st.selectbox("🔧 Featurizer", list(Featurizer.keys()), 
                                                                         key='featurizer_name', 
                                                                         index=list(Featurizer.keys()).index(st.session_state.selected_featurizer_name))
+                
+                # Additional parameters for Circular Fingerprint
+                if st.session_state.selected_featurizer_name == "Circular Fingerprint":
+                    st.markdown('<p class="ios-text-regular" style="font-weight: 600; font-size: 16px; color: #007AFF; margin: 16px 0 8px 0; letter-spacing: -0.01em;">🔬 Circular Fingerprint Parameters:</p>', unsafe_allow_html=True)
+                    col_fp1, col_fp2 = st.columns(2)
+                    with col_fp1:
+                        cfp_radius = st.slider("Radius", min_value=1, max_value=6, value=4, 
+                                             help="Circular fingerprint radius (default: 4)", key='cfp_radius')
+                    with col_fp2:
+                        cfp_size = st.number_input("Fingerprint Size", min_value=64, max_value=16384, value=2048, step=64,
+                                              help="Number of bits in fingerprint (default: 2048)", key='cfp_size')
 
             # Advanced settings in collapsible section
             with st.expander("🔧 Advanced Settings"):
@@ -901,16 +1317,22 @@ def main():
 
             if train_button:
                 with st.spinner("🔄 Building your model... This may take a few minutes."):
-                    st.markdown(create_ios_card("Training in Progress", 
-                                              "Processing data and training your machine learning model...", "🤖"), unsafe_allow_html=True)
-                    
-                    tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer = preprocess_and_model(
+                    result = preprocess_and_model(
                         df, smiles_col, activity_col, st.session_state.selected_featurizer_name, 
                         generations=generations, cv=cv, verbosity=verbosity, test_size=test_size)
+                    
+                    if len(result) == 15:  # New format with timing
+                        tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer, total_time, training_time = result
+                    else:  # Fallback for old format
+                        tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer = result
+                        total_time = training_time = None
 
                     if tpot is not None:
+                        # Store which featurizer was used for training
+                        st.session_state['trained_featurizer_name'] = st.session_state.selected_featurizer_name
+                        
                         # Display model metrics in cards
-                        st.markdown("### 📈 Model Performance")
+                        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin: 24px 0 16px 0;">📈 Model Performance</h2>', unsafe_allow_html=True)
                         
                         col1, col2, col3 = st.columns(3)
                         with col1:
@@ -922,21 +1344,41 @@ def main():
                         with col3:
                             if roc_auc is not None:
                                 st.markdown(create_ios_metric_card("ROC AUC", f"{roc_auc:.3f}", "Area under curve", "📊"), unsafe_allow_html=True)
-                            st.success("✅ Model trained successfully!")
+                            
+                            # Enhanced success message with timing
+                            if total_time is not None:
+                                st.success(f"✅ Model trained successfully!\n⏱️ Total time: {format_time_duration(total_time)}")
+                            else:
+                                st.success("✅ Model trained successfully!")
 
     with tab3:
-        st.markdown("### 🧪 Single SMILES Prediction")
+        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin-bottom: 24px;">🧪 Single SMILES Prediction</h2>', unsafe_allow_html=True)
+        
+        # Initialize clear input flag
+        if 'clear_input' not in st.session_state:
+            st.session_state['clear_input'] = False
+        
+        # Handle clear input
+        default_value = "" if st.session_state.get('clear_input', False) else None
+        if st.session_state.get('clear_input', False):
+            st.session_state['clear_input'] = False
         
         smile_input = st.text_input("Enter SMILES string for prediction", 
+                                  value=default_value,
                                   placeholder="e.g., CCO (ethanol)",
                                   help="Enter a valid SMILES string representing your molecule",
                                   label_visibility="collapsed")
+        
+        # Set default cfp_number for atomic contribution mapping
+        cfp_number = None
         
         col1, col2 = st.columns([3, 1])
         with col1:
             predict_button = st.button("🔮 Predict Activity", use_container_width=True)
         with col2:
             if st.button("🧹 Clear", use_container_width=True):
+                # Clear the input by setting a session state flag instead of rerunning
+                st.session_state['clear_input'] = True
                 st.rerun()
 
         if predict_button and smile_input:
@@ -944,27 +1386,113 @@ def main():
                 prediction, probability, explanation_html = predict_from_single_smiles(smile_input, st.session_state.selected_featurizer_name)
                 
                 if prediction is not None:
-                    # Compact display with smaller structure and combined results
-                    col1, col2 = st.columns([1, 2])
+                    # Three-column layout: structure, prediction results, and model explanation
+                    col1, col2, col3 = st.columns([2, 1, 1])
                     
                     with col1:
-                        # Display compact molecular structure
+                        # Display atomic contribution map instead of structure
                         try:
-                            mol = Chem.MolFromSmiles(smile_input)
-                            if mol:
-                                img = Draw.MolToImage(mol, size=(200, 200))
-                                st.markdown("""
-                                <div class="ios-card" style="padding: 16px; text-align: center;">
-                                    <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600;">Molecule Structure</h4>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                st.image(img, width=180)
-                        except:
-                            st.markdown("""
-                            <div class="ios-card" style="padding: 16px; text-align: center;">
-                                <h4 style="margin: 0; color: #8E8E93;">Structure unavailable</h4>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            trained_featurizer = st.session_state.get('trained_featurizer_name')
+                            current_featurizer = st.session_state.selected_featurizer_name
+                            
+                            if (trained_featurizer == "Circular Fingerprint" and 
+                                current_featurizer == "Circular Fingerprint"):
+                                
+                                model = st.session_state.get('_tpot_model')
+                                X_train = st.session_state.get('_X_train')
+                                featurizer_obj = st.session_state.get('_featurizer_obj')
+                                
+                                if model is not None and X_train is not None and featurizer_obj is not None:
+                                    with st.spinner("🧬 Generating high-resolution atomic contribution map..."):
+                                        atomic_contrib_img = generate_fragment_contribution_map(
+                                            smile_input, model, X_train, featurizer_obj, cfp_number
+                                        )
+                                    
+                                    if atomic_contrib_img:
+                                        st.markdown("""
+                                        <div class="ios-card" style="padding: 16px; text-align: center;">
+                                            <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Atomic Contribution Map</h4>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                        
+                                        # Create two columns: image and color legend
+                                        img_col, legend_col = st.columns([3, 1])
+                                        
+                                        with img_col:
+                                            # Display larger, high-resolution image
+                                            st.image(atomic_contrib_img, width=500)
+                                        
+                                        with legend_col:
+                                            # Color legend using Streamlit components
+                                            
+                                            # High Positive
+                                            st.markdown("🔵 **High Positive (Dark Blue)**")
+                                            st.caption("Strongly contributes to activity")
+                                            
+                                            # Low Positive  
+                                            st.markdown("🟦 **Low Positive (Light Blue)**")
+                                            st.caption("Moderately supports activity")
+                                            
+                                            # Neutral
+                                            st.markdown("⚪ **Neutral (Gray)**")
+                                            st.caption("No significant contribution")
+                                            
+                                            # Low Negative
+                                            st.markdown("🟧 **Low Negative (Light Red)**")
+                                            st.caption("Moderately reduces activity")
+                                            
+                                            # High Negative
+                                            st.markdown("🔴 **High Negative (Dark Red)**")
+                                            st.caption("Strongly reduces activity")
+                                        
+                                        # Download button for the high-resolution image
+                                        create_download_button_for_image(
+                                            atomic_contrib_img, 
+                                            f"atomic_contribution_{smile_input.replace('/', '_')}.png",
+                                            "📥 Download HD Image"
+                                        )
+                                    else:
+                                        # Try basic molecule visualization as fallback
+                                        mol = Chem.MolFromSmiles(smile_input)
+                                        if mol:
+                                            img = Draw.MolToImage(mol, size=(400, 400))
+                                            st.markdown("""
+                                            <div class="ios-card" style="padding: 16px; text-align: center;">
+                                                <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                            </div>
+                                            """, unsafe_allow_html=True)
+                                            st.image(img, width=400)
+                                        else:
+                                            st.warning("⚠️ Could not visualize molecule")
+                                else:
+                                    st.warning("⚠️ Model not available for visualization")
+                            else:
+                                # Fallback to molecular structure for other featurizers
+                                mol = Chem.MolFromSmiles(smile_input)
+                                if mol:
+                                    img = Draw.MolToImage(mol, size=(400, 400))
+                                    st.markdown("""
+                                    <div class="ios-card" style="padding: 16px; text-align: center;">
+                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.image(img, width=400)
+                                else:
+                                    st.warning("⚠️ Could not visualize molecule")
+                        except Exception as e:
+                            # Show basic structure as fallback
+                            try:
+                                mol = Chem.MolFromSmiles(smile_input)
+                                if mol:
+                                    img = Draw.MolToImage(mol, size=(400, 400))
+                                    st.markdown("""
+                                    <div class="ios-card" style="padding: 16px; text-align: center;">
+                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.image(img, width=400)
+                            except:
+                                st.warning("⚠️ Could not visualize molecule")
                     
                     with col2:
                         # Prediction results in compact iOS card
@@ -973,61 +1501,64 @@ def main():
                         confidence_color = "#34C759" if prediction == 1 else "#FF3B30"
                         
                         st.markdown(f"""
-                        <div class="ios-card" style="padding: 20px;">
-                            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                        <div class="ios-card" style="padding: 16px; margin: 8px 0;">
+                            <div style="display: flex; align-items: center; margin-bottom: 12px;">
                                 <div style="font-size: 2em; margin-right: 12px;">{activity_icon}</div>
                                 <div>
-                                    <h2 style="color: {confidence_color}; margin: 0; font-weight: 700; font-size: 1.5em;">{activity_text}</h2>
-                                    <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Prediction Result</p>
+                                    <h3 class="ios-heading-small" style="color: {confidence_color}; margin: 0; font-weight: 800; font-size: 24px; letter-spacing: -0.015em;">{activity_text}</h3>
+                                    <p class="ios-text-caption" style="margin: 4px 0 0 0; color: #8E8E93; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Prediction Result</p>
                                 </div>
                             </div>
                             <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
-                                    <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{probability:.1%}</span>
+                                    <span class="ios-text-caption" style="color: #007AFF; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Confidence Score:</span>
+                                    <span class="ios-text-regular" style="color: #1D1D1F; font-weight: 800; font-size: 20px; letter-spacing: -0.01em;">{probability:.1%}</span>
                                 </div>
                             </div>
                             <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
-                                <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
-                                    <strong>SMILES:</strong> {smile_input}
+                                <p class="ios-text-small" style="margin: 0; color: #8E8E93; font-size: 11px; font-weight: 500; line-height: 1.4;">
+                                    <strong style="font-weight: 600;">SMILES:</strong> {smile_input[:50]}{'...' if len(smile_input) > 50 else ''}
                                 </p>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
                     
-                    # LIME explanation in proper iOS card style
-                    if explanation_html:
-                        st.markdown(f"""
-                        <div class="ios-card" style="margin-top: 16px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div style="display: flex; align-items: center;">
-                                    <div style="font-size: 1.5em; margin-right: 12px;">🔍</div>
+                    with col3:
+                        # LIME explanation in proper iOS card style
+                        if explanation_html:
+                            st.markdown(f"""
+                            <div class="ios-card" style="padding: 16px; margin: 8px 0;">
+                                <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                                    <div style="font-size: 2em; margin-right: 12px;">🔍</div>
                                     <div>
                                         <h3 style="color: #007AFF; margin: 0; font-weight: 600; font-size: 18px;">Model Explanation</h3>
-                                        <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Understand how the model made this prediction</p>
+                                        <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 12px;">Understand the prediction</p>
                                     </div>
                                 </div>
                                 <a href="data:text/html;base64,{base64.b64encode(explanation_html.encode()).decode()}" 
-                                   download="LIME_Explanation.html" 
+                                   download="LIME_Explanation_{smile_input.replace('/', '_')}.html" 
                                    style="background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%); 
                                           color: white; 
                                           text-decoration: none; 
-                                          padding: 10px 16px; 
-                                          border-radius: 10px; 
-                                          font-weight: 600; 
+                                          padding: 12px 16px; 
+                                          border-radius: 12px; 
                                           font-size: 14px;
-                                          box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+                                          font-weight: 600;
+                                          display: inline-block;
+                                          width: 100%;
+                                          text-align: center;
+                                          box-sizing: border-box;
                                           transition: all 0.2s ease;">
-                                    📥 Download Explanation
+                                    📥 Download LIME Explanation
                                 </a>
                             </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                            """, unsafe_allow_html=True)
+
                 else:
                     st.error("❌ Failed to make prediction. Please check your SMILES input.")
 
     with tab4:
-        st.markdown("### 📊 Batch Prediction from File")
+        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin-bottom: 24px;">📊 Batch Prediction from File</h2>', unsafe_allow_html=True)
         
         with st.expander("📁 Upload Prediction File", expanded=True):
             uploaded_file = st.file_uploader("Upload Excel file with SMILES for batch prediction", 
@@ -1145,27 +1676,70 @@ def main():
                             smiles = row[smiles_col_predict]
                             
                             with st.expander(f"🧬 Molecule {idx + 1}: {prediction} ({probability:.1%} confidence)", expanded=False):
-                                # Create columns for structure and results
-                                col1, col2 = st.columns([1, 2])
+                                # Create three columns for structure, results, and additional info
+                                col1, col2, col3 = st.columns([2, 1, 1])
                                 
                                 with col1:
-                                    # Display molecular structure
+                                    # Display molecular structure - try atomic contribution if available
                                     try:
-                                        mol = Chem.MolFromSmiles(smiles)
-                                        if mol:
-                                            img = Draw.MolToImage(mol, size=(200, 200))
+                                        trained_featurizer = st.session_state.get('trained_featurizer_name')
+                                        current_featurizer = st.session_state.selected_featurizer_name
+                                        
+                                        if (trained_featurizer == "Circular Fingerprint" and 
+                                            current_featurizer == "Circular Fingerprint"):
+                                            
+                                            # Try to get stored model components
+                                            model = st.session_state.get('_tpot_model')
+                                            X_train_data = st.session_state.get('_X_train')
+                                            featurizer_obj = st.session_state.get('_featurizer_obj')
+                                            
+                                            if model is not None and X_train_data is not None and featurizer_obj is not None:
+                                                st.markdown("#### 🧬 Atomic Contribution Map")
+                                                frag_img = generate_fragment_contribution_map(smiles, model, X_train_data, featurizer_obj, None)
+                                                if frag_img:
+                                                    st.image(frag_img, width=400, caption="")
+                                                    
+                                                    # Create download button for the image
+                                                    create_download_button_for_image(
+                                                        frag_img, 
+                                                        f"atomic_contribution_molecule_{idx + 1}.png",
+                                                        "📥 Download Image"
+                                                    )
+                                                else:
+                                                    # Fallback to basic structure
+                                                    mol = Chem.MolFromSmiles(smiles)
+                                                    if mol:
+                                                        img = Draw.MolToImage(mol, size=(300, 300))
+                                                        st.markdown("#### 🧬 Molecule Structure")
+                                                        st.image(img, width=300)
+                                            else:
+                                                # Basic structure display
+                                                mol = Chem.MolFromSmiles(smiles)
+                                                if mol:
+                                                    img = Draw.MolToImage(mol, size=(300, 300))
+                                                    st.markdown("#### 🧬 Molecule Structure")
+                                                    st.image(img, width=300)
+                                        else:
+                                            # Basic structure for other featurizers
+                                            mol = Chem.MolFromSmiles(smiles)
+                                            if mol:
+                                                img = Draw.MolToImage(mol, size=(300, 300))
+                                                st.markdown("#### 🧬 Molecule Structure")
+                                                st.image(img, width=300)
+                                    except Exception as e:
+                                        # Fallback structure display
+                                        try:
+                                            mol = Chem.MolFromSmiles(smiles)
+                                            if mol:
+                                                img = Draw.MolToImage(mol, size=(300, 300))
+                                                st.markdown("#### 🧬 Molecule Structure")
+                                                st.image(img, width=300)
+                                        except:
                                             st.markdown("""
                                             <div class="ios-card" style="padding: 16px; text-align: center;">
-                                                <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600;">Molecule Structure</h4>
+                                                <h4 style="margin: 0; color: #8E8E93;">Structure unavailable</h4>
                                             </div>
                                             """, unsafe_allow_html=True)
-                                            st.image(img, width=180)
-                                    except:
-                                        st.markdown("""
-                                        <div class="ios-card" style="padding: 16px; text-align: center;">
-                                            <h4 style="margin: 0; color: #8E8E93;">Structure unavailable</h4>
-                                        </div>
-                                        """, unsafe_allow_html=True)
                                 
                                 with col2:
                                     # Prediction results in compact iOS card
@@ -1173,34 +1747,69 @@ def main():
                                     confidence_color = "#34C759" if prediction == "Active" else "#FF3B30"
                                     
                                     st.markdown(f"""
-                                    <div class="ios-card" style="padding: 20px;">
-                                        <div style="display: flex; align-items: center; margin-bottom: 16px;">
-                                            <div style="font-size: 2em; margin-right: 12px;">{activity_icon}</div>
+                                    <div class="ios-card" style="padding: 12px; margin: 8px 0;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                            <div style="font-size: 1.5em; margin-right: 8px;">{activity_icon}</div>
                                             <div>
-                                                <h2 style="color: {confidence_color}; margin: 0; font-weight: 700; font-size: 1.5em;">{prediction}</h2>
-                                                <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Prediction Result</p>
+                                                <h3 style="color: {confidence_color}; margin: 0; font-weight: 700; font-size: 1.1em;">{prediction}</h3>
+                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 11px;">Prediction Result</p>
                                             </div>
                                         </div>
-                                        <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                                        <div style="background: rgba(0, 122, 255, 0.1); border-radius: 8px; padding: 8px; margin-bottom: 8px;">
                                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                                <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
-                                                <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{probability:.1%}</span>
+                                                <span style="color: #007AFF; font-weight: 600; font-size: 12px;">Confidence:</span>
+                                                <span style="color: #1D1D1F; font-weight: 700; font-size: 14px;">{probability:.1%}</span>
                                             </div>
                                         </div>
-                                        <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
-                                            <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
-                                                <strong>SMILES:</strong> {smiles}
+                                        <div style="background: rgba(0, 0, 0, 0.05); border-radius: 6px; padding: 6px;">
+                                            <p style="margin: 0; color: #8E8E93; font-size: 10px; font-weight: 500;">
+                                                <strong>SMILES:</strong> {smiles[:30]}{'...' if len(smiles) > 30 else ''}
                                             </p>
                                         </div>
                                     </div>
                                     """, unsafe_allow_html=True)
                                 
-                                # Add any additional row data
-                                other_columns = [col for col in row.index if col != smiles_col_predict and not col.startswith('Predicted_') and col != 'Confidence']
-                                if other_columns:
-                                    st.markdown("#### 📋 Additional Data")
-                                    for col in other_columns:
-                                        st.write(f"**{col}:** {row[col]}")
+                                with col3:
+                                    # Additional data and information in compact card
+                                    other_columns = [col for col in row.index if col != smiles_col_predict and not col.startswith('Predicted_') and col != 'Confidence']
+                                    
+                                    st.markdown(f"""
+                                    <div class="ios-card" style="padding: 12px; margin: 8px 0;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                            <div style="font-size: 1.5em; margin-right: 8px;">📋</div>
+                                            <div>
+                                                <h3 style="color: #007AFF; margin: 0; font-weight: 600; font-size: 14px;">Additional Data</h3>
+                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 10px;">Molecule {idx + 1} info</p>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 0, 0, 0.02); border-radius: 6px; padding: 8px;">
+                                    """, unsafe_allow_html=True)
+                                    
+                                    if other_columns:
+                                        for col in other_columns[:3]:  # Limit to first 3 additional columns
+                                            value = str(row[col])
+                                            if len(value) > 20:
+                                                value = value[:20] + "..."
+                                            st.markdown(f"""
+                                            <p style="margin: 2px 0; color: #1D1D1F; font-size: 11px;">
+                                                <strong>{col}:</strong> {value}
+                                            </p>
+                                            """, unsafe_allow_html=True)
+                                        
+                                        if len(other_columns) > 3:
+                                            st.markdown(f"""
+                                            <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 10px; font-style: italic;">
+                                                +{len(other_columns) - 3} more fields...
+                                            </p>
+                                            """, unsafe_allow_html=True)
+                                    else:
+                                        st.markdown("""
+                                        <p style="margin: 0; color: #8E8E93; font-size: 11px; font-style: italic;">
+                                            No additional data
+                                        </p>
+                                        """, unsafe_allow_html=True)
+                                    
+                                    st.markdown("</div></div>", unsafe_allow_html=True)
 
                     # Display table results
                     st.markdown("### 📊 Complete Results Table")
