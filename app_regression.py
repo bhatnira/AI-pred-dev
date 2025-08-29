@@ -438,7 +438,7 @@ def standardize_mol(mol, verbose=False):
     return taut_uncharged_parent_clean_mol
 
 # Function to preprocess data and perform modeling for regression
-def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generations=5, population_size=20, cv=5, test_size=0.20, random_state=42, verbosity=2):
+def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generations=5, population_size=20, cv=5, test_size=0.20, random_state=42, verbosity=2, cfp_params=None):
     with st.spinner("Preparing molecular data..."):
         # Standardize SMILES
         df[smiles_col + '_standardized'] = df[smiles_col].apply(standardize_smiles)
@@ -448,7 +448,17 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
 
     with st.spinner("Generating molecular features..."):
         # Featurize molecules
-        featurizer = get_featurizers()[featurizer_name]
+        featurizers_dict = get_featurizers()
+        
+        # Use custom CFP parameters if provided for Circular Fingerprint
+        if featurizer_name == "Circular Fingerprint" and cfp_params:
+            import deepchem as dc
+            featurizer = dc.feat.CircularFingerprint(
+                size=cfp_params.get('size', 2048), 
+                radius=cfp_params.get('radius', 4)
+            )
+        else:
+            featurizer = featurizers_dict[featurizer_name]
         features = []
         failed_molecules = 0
         
@@ -624,7 +634,11 @@ def predict_from_single_smiles(single_smiles, featurizer_name='Circular Fingerpr
     if standardized_smiles:
         mol = Chem.MolFromSmiles(standardized_smiles)
         if mol is not None:
-            featurizer = get_featurizers()[featurizer_name]
+            # Use stored featurizer if available (from training), otherwise create new one
+            if 'featurizer' in st.session_state and st.session_state.featurizer is not None:
+                featurizer = st.session_state.featurizer
+            else:
+                featurizer = get_featurizers()[featurizer_name]
             try:
                 features = featurizer.featurize([mol])[0]
                 
@@ -1110,6 +1124,17 @@ def main():
                         key='train_featurizer_name',
                         index=list(Featurizer.keys()).index(st.session_state.selected_featurizer_name)
                     )
+                    
+                    # Additional parameters for Circular Fingerprint
+                    if st.session_state.selected_featurizer_name == "Circular Fingerprint":
+                        st.markdown("#### 🔬 Circular Fingerprint Parameters")
+                        col_fp1, col_fp2 = st.columns(2)
+                        with col_fp1:
+                            cfp_radius = st.slider("Radius", min_value=1, max_value=6, value=4, 
+                                                 help="Circular fingerprint radius (default: 4)", key='cfp_radius')
+                        with col_fp2:
+                            cfp_size = st.number_input("Fingerprint Size", min_value=64, max_value=16384, value=2048, step=64,
+                                                  help="Number of bits in fingerprint (default: 2048)", key='cfp_size')
 
                 with col2:
                     with st.expander("🔧 Advanced Settings"):
@@ -1120,9 +1145,17 @@ def main():
 
                 # Build model button
                 if st.button("🚀 Build and Train Model", use_container_width=True):
+                    # Get CFP parameters if Circular Fingerprint is selected
+                    cfp_params = {}
+                    if st.session_state.selected_featurizer_name == "Circular Fingerprint":
+                        cfp_params = {
+                            'radius': locals().get('cfp_radius', 4),
+                            'size': locals().get('cfp_size', 2048)
+                        }
+                    
                     result = preprocess_and_model(
                         df, smiles_col, activity_col, st.session_state.selected_featurizer_name, 
-                        generations, cv=cv, test_size=test_size, verbosity=verbosity
+                        generations, cv=cv, test_size=test_size, verbosity=verbosity, cfp_params=cfp_params
                     )
                     
                     if result[0] is not None:  # Check if modeling was successful
@@ -1191,21 +1224,6 @@ def main():
                 st.markdown(create_ios_card("⚠️ Model Required", 
                            "Please train a model first in the 'Build Model' tab to use predictions.", "⚠️"), unsafe_allow_html=True)
                 st.stop()
-
-        # Featurizer compatibility warning
-        if st.session_state.selected_featurizer_name == "modred":
-            st.markdown(create_ios_card("⚙️ Featurizer Info", 
-                       f"""
-                       <p><strong>Current Model Featurizer:</strong> {st.session_state.selected_featurizer_name} (Mordred Descriptors)</p>
-                
-                       If this happens, the system will automatically fall back to CircularFingerprint for prediction.</p>
-                       """, "ℹ️"), unsafe_allow_html=True)
-        else:
-            st.markdown(create_ios_card("⚙️ Featurizer Info", 
-                       f"""
-                       <p><strong>Current Model Featurizer:</strong> {st.session_state.selected_featurizer_name}</p>
-                       <p style="color: #34C759;">This featurizer is generally stable for most molecular structures.</p>
-                       """, "ℹ️"), unsafe_allow_html=True)
 
         # SMILES input
         col1, col2 = st.columns([3, 1])
