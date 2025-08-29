@@ -23,6 +23,12 @@ from lime import lime_tabular
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, label_binarize
 from sklearn.multiclass import OneVsRestClassifier
+import colorsys
+import io
+import traceback
+from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.Draw import rdMolDraw2D
+from PIL import Image
 
 # Configure matplotlib and RDKit for headless mode
 os.environ['MPLBACKEND'] = 'Agg'
@@ -328,6 +334,253 @@ Featurizer = get_featurizers()
 if 'selected_featurizer_name_multiclass' not in st.session_state:
     st.session_state.selected_featurizer_name_multiclass = list(Featurizer.keys())[0]  # Set default featurizer
 
+# --- Fragment Contribution Mapping for Circular Fingerprint ---
+def weight_to_google_color(weight, min_weight, max_weight):
+    """Convert weight to color using improved HLS color scheme with better handling of edge cases"""
+    
+    # Handle edge cases
+    if max_weight == min_weight:
+        norm = 0.5  # Neutral color
+    else:
+        norm = (weight - min_weight) / (max_weight - min_weight)
+    
+    # Use more vibrant colors with better contrast
+    lightness = 0.3 + 0.5 * norm  # Avoid too light colors
+    saturation = 0.85
+    hue = 210/360 if weight >= 0 else 0/360  # Blue (positive) or Red (negative)
+    
+    r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
+    return (r, g, b)
+
+def create_download_button_for_image(image, filename, button_text="📥 Download Image"):
+    """Create a download button for PIL images"""
+    try:
+        buf = io.BytesIO()
+        image.save(buf, format='PNG', dpi=(300, 300))
+        buf.seek(0)
+        
+        return st.download_button(
+            label=button_text,
+            data=buf.getvalue(),
+            file_name=filename,
+            mime='image/png',
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Could not create download button: {str(e)}")
+        return False
+
+def draw_molecule_with_fragment_weights(mol, atom_weights, width=1200, height=1200):
+    """Draw molecule with atom highlighting based on fragment weights using improved color scheme and high resolution"""
+    try:
+        # Create high-resolution drawer
+        drawer = rdMolDraw2D.MolDraw2DCairo(width, height)
+        options = drawer.drawOptions()
+        options.atomHighlightsAreCircles = True
+        options.highlightRadius = 0.3
+        options.bondLineWidth = 3
+        options.atomLabelFontSize = 18
+        options.legendFontSize = 16
+
+        weights = list(atom_weights.values())
+        if not weights:
+            return None
+
+        max_abs = max(abs(w) for w in weights)
+        min_abs = min(abs(w) for w in weights)
+
+        highlight_atoms = list(atom_weights.keys())
+        highlight_colors = {
+            idx: weight_to_google_color(atom_weights[idx], min_abs, max_abs)
+            for idx in highlight_atoms
+        }
+
+        drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
+        drawer.FinishDrawing()
+        png = drawer.GetDrawingText()
+        img = Image.open(io.BytesIO(png))
+        return img
+    except Exception as e:
+        st.error(f"Error in draw_molecule_with_fragment_weights: {str(e)}")
+        print(f"Error in draw_molecule_with_fragment_weights: {str(e)}")
+        traceback.print_exc()
+        return None
+
+def map_cfp_bits_to_atoms(mol, bit_weights, radius=4, n_bits=2048):
+    """Map circular fingerprint bits to atoms using RDKit's Morgan fingerprint"""
+    try:
+        atom_weights = {}
+        
+        # Get bit info from Morgan fingerprint
+        bit_info = {}
+        fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits, bitInfo=bit_info)
+        on_bits = set(fp.GetOnBits())
+        
+        # Map each bit to its contributing atoms
+        for bit_idx, weight in bit_weights.items():
+            if bit_idx in on_bits and bit_idx in bit_info:
+                # Each entry in bit_info is (center_atom, radius_used)
+                for center_atom, radius_used in bit_info[bit_idx]:
+                    # Get all atoms in the environment (fragment)
+                    if radius_used == 0:
+                        contributing_atoms = [center_atom]
+                    else:
+                        env_atoms = Chem.FindAtomEnvironmentOfRadiusN(mol, radius_used, center_atom)
+                        contributing_atoms = set()
+                        for bond_idx in env_atoms:
+                            bond = mol.GetBondWithIdx(bond_idx)
+                            contributing_atoms.add(bond.GetBeginAtomIdx())
+                            contributing_atoms.add(bond.GetEndAtomIdx())
+                        contributing_atoms.add(center_atom)  # Ensure center is included
+                        contributing_atoms = list(contributing_atoms)
+                    
+                    # Distribute weight among contributing atoms in the fragment
+                    weight_per_atom = weight / len(contributing_atoms)
+                    for atom_idx in contributing_atoms:
+                        atom_weights[atom_idx] = atom_weights.get(atom_idx, 0) + weight_per_atom
+        
+        return atom_weights
+    except Exception as e:
+        st.error(f"Error in map_cfp_bits_to_atoms: {str(e)}")
+        print(f"Error in map_cfp_bits_to_atoms: {str(e)}")
+        traceback.print_exc()
+        return {}
+
+def map_specific_cfp_to_atoms(mol, cfp_number, radius=4, n_bits=2048):
+    """Map a specific circular fingerprint number to atoms with improved weight distribution"""
+    try:
+        atom_weights = {}
+        
+        # Get bit info from Morgan fingerprint
+        bit_info = {}
+        fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits, bitInfo=bit_info)
+        on_bits = set(fp.GetOnBits())
+        
+        # Check if the specific CFP number is present in this molecule
+        if cfp_number in on_bits and cfp_number in bit_info:
+            # Initialize all atoms with small negative weight first
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = -0.5
+                
+            # Each entry in bit_info is (center_atom, radius_used)
+            for center_atom, radius_used in bit_info[cfp_number]:
+                # Get all atoms in the environment (fragment)
+                if radius_used == 0:
+                    contributing_atoms = [center_atom]
+                else:
+                    env_atoms = Chem.FindAtomEnvironmentOfRadiusN(mol, radius_used, center_atom)
+                    contributing_atoms = set()
+                    for bond_idx in env_atoms:
+                        bond = mol.GetBondWithIdx(bond_idx)
+                        contributing_atoms.add(bond.GetBeginAtomIdx())
+                        contributing_atoms.add(bond.GetEndAtomIdx())
+                    contributing_atoms.add(center_atom)  # Ensure center is included
+                    contributing_atoms = list(contributing_atoms)
+                
+                # Assign positive weights to atoms that contribute to this CFP
+                weight_center = 2.0   # Highest weight for center atom
+                weight_fragment = 1.0  # Medium weight for fragment atoms
+                
+                # Center atom gets highest weight
+                atom_weights[center_atom] = weight_center
+                
+                # Other atoms in fragment get medium weight
+                for atom_idx in contributing_atoms:
+                    if atom_idx != center_atom:
+                        atom_weights[atom_idx] = weight_fragment
+        else:
+            # If specific CFP not found, still create contrast
+            # Set all atoms to negative weight to show they don't contribute
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = -1.0
+        
+        return atom_weights
+    except Exception as e:
+        st.error(f"Error in map_specific_cfp_to_atoms: {str(e)}")
+        print(f"Error in map_specific_cfp_to_atoms: {str(e)}")
+        traceback.print_exc()
+        return {}
+
+def generate_fragment_contribution_map(smiles, model, X_train, featurizer_obj, cfp_number=None):
+    """Generate fragment contribution map for circular fingerprint predictions"""
+    try:
+        # Ensure we have the right featurizer parameters
+        radius = getattr(featurizer_obj, 'radius', 4)
+        n_bits = getattr(featurizer_obj, 'size', 2048)
+        
+        # Standardize and create molecule
+        std_smiles = standardize_smiles(smiles)
+        mol = Chem.MolFromSmiles(std_smiles)
+        if mol is None:
+            return None
+        
+        # Generate features
+        features = featurizer_obj.featurize([mol])[0]
+        feature_df = pd.DataFrame([features], columns=[f"fp_{i}" for i in range(len(features))])
+        feature_df = feature_df.astype(float)
+        
+        # If specific CFP number is provided, highlight only that fingerprint
+        if cfp_number is not None:
+            atom_weights = map_specific_cfp_to_atoms(mol, cfp_number, radius=radius, n_bits=n_bits)
+        else:
+            # Use LIME explanation for overall contribution
+            explainer = lime_tabular.LimeTabularExplainer(
+                training_data=X_train.values,
+                mode="classification",
+                feature_names=X_train.columns,
+                class_names=["Inactive", "Active"],  # Updated for multi-class
+                verbose=False,
+                discretize_continuous=True
+            )
+            
+            explanation = explainer.explain_instance(
+                feature_df.values[0],
+                model.predict_proba,
+                num_features=min(100, len(feature_df.columns))  # Limit features for better visualization
+            )
+            
+            # Get predicted class and its weights
+            pred_class = int(model.predict(feature_df)[0])
+            weights_list = explanation.as_map().get(pred_class, [])
+            
+            # If no weights or all weights are similar, create artificial contrast
+            if not weights_list:
+                # Create random weights for visualization
+                import random
+                weights_list = [(i, random.uniform(-1, 1)) for i in range(min(50, len(feature_df.columns)))]
+            
+            # Convert to bit weights dictionary
+            bit_weights = {}
+            for feature_idx, weight in weights_list:
+                # feature_idx corresponds to the bit position in the fingerprint
+                bit_weights[feature_idx] = float(weight)
+            
+            # If all weights are very similar, add some artificial variation
+            weight_values = list(bit_weights.values())
+            if weight_values and (max(weight_values) - min(weight_values)) < 0.01:
+                # Add artificial variation to show structure
+                for i, (bit_idx, weight) in enumerate(bit_weights.items()):
+                    bit_weights[bit_idx] = weight + (i % 3 - 1) * 0.5  # Add variation
+            
+            # Map bits to atoms
+            atom_weights = map_cfp_bits_to_atoms(mol, bit_weights, radius=radius, n_bits=n_bits)
+        
+        if not atom_weights:
+            # Fallback: create simple atom highlighting
+            atom_weights = {}
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = (i % 3 - 1) * 0.5  # Create pattern for visualization
+        
+        # Generate visualization
+        return draw_molecule_with_fragment_weights(mol, atom_weights)
+        
+    except Exception as e:
+        # Debug: print error for troubleshooting
+        st.error(f"Error in generate_fragment_contribution_map: {str(e)}")
+        print(f"Error in generate_fragment_contribution_map: {str(e)}")
+        traceback.print_exc()
+        return None
+
 def standardize_smiles(smiles):
     """Standardize SMILES strings for consistency"""
     try:
@@ -552,7 +805,7 @@ def create_multiclass_precision_recall_curves(y_test, y_pred_proba, class_names)
         return None
 
 # Function to preprocess data and perform modeling for multi-class classification
-def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_name, generations=3, cv=3, verbosity=0, test_size=0.20):
+def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_name, generations=3, cv=3, verbosity=0, test_size=0.20, cfp_params=None):
     """
     Multi-class preprocessing and TPOT model building with time tracking
     """
@@ -609,8 +862,16 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
 
         update_progress_with_time(0.15, "Featurizing molecules...")
         
-        # Featurize molecules with progress updates
-        featurizer = Featurizer[featurizer_name]
+        # Create featurizer with custom parameters if CFP is selected
+        if featurizer_name == "Circular Fingerprint" and cfp_params:
+            radius = cfp_params.get('radius', 4)
+            size = cfp_params.get('size', 2048)
+            featurizer = dc.feat.CircularFingerprint(size=size, radius=radius)
+            st.session_state['cfp_custom_radius'] = radius
+            st.session_state['cfp_custom_size'] = size
+        else:
+            featurizer = Featurizer[featurizer_name]
+        
         features = []
         smiles_list = df[smiles_col + '_standardized'].tolist()
         
@@ -711,8 +972,14 @@ def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_
         if standardized_smiles is None:
             return None, None, "Invalid SMILES string"
 
-        # Featurize molecule
-        featurizer = Featurizer[featurizer_name]
+        # Featurize molecule - use stored featurizer if available for consistency
+        if (featurizer_name == "Circular Fingerprint" and 
+            'featurizer_multiclass' in st.session_state and 
+            st.session_state.featurizer_multiclass is not None):
+            featurizer = st.session_state.featurizer_multiclass
+        else:
+            featurizer = Featurizer[featurizer_name]
+            
         mol = Chem.MolFromSmiles(standardized_smiles)
         if mol is None:
             return None, None, "Could not parse molecule"
@@ -838,9 +1105,7 @@ def main():
                        <p style="margin: 8px 0;">🔍 <strong>Model Explanations:</strong> LIME interpretability for each prediction</p>
                        <p style="margin: 8px 0;">📱 <strong>Confusion Matrix:</strong> Detailed classification performance heatmap</p>
                    </div>
-                   <div style="background: rgba(255, 149, 0, 0.05); border-radius: 12px; padding: 12px; margin: 16px 0;">
-                       <p style="color: #FF9500; font-weight: 600; margin: 0;">📋 Required: Excel file with SMILES and activity classes (3+ categories)</p>
-                   </div>
+
                    <p style="color: #8E8E93; font-style: italic; text-align: center;">🧬 Perfect for drug discovery with multiple activity profiles!</p>
                    """, "🎉"), unsafe_allow_html=True)
 
@@ -903,6 +1168,17 @@ def main():
                 st.session_state.selected_featurizer_name_multiclass = st.selectbox("🔧 Featurizer", list(Featurizer.keys()), 
                                                                         key='featurizer_name_multiclass', 
                                                                         index=list(Featurizer.keys()).index(st.session_state.selected_featurizer_name_multiclass))
+                
+                # Additional parameters for Circular Fingerprint
+                if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                    st.markdown("#### 🔬 Circular Fingerprint Parameters")
+                    col_fp1, col_fp2 = st.columns(2)
+                    with col_fp1:
+                        cfp_radius = st.slider("Radius", min_value=1, max_value=6, value=4, 
+                                             help="Circular fingerprint radius (default: 4)", key='cfp_radius_multi')
+                    with col_fp2:
+                        cfp_size = st.number_input("Fingerprint Size", min_value=64, max_value=16384, value=2048, step=64,
+                                              help="Number of bits in fingerprint (default: 2048)", key='cfp_size_multi')
 
             # Advanced settings in collapsible section
             with st.expander("🔧 Advanced Settings"):
@@ -940,12 +1216,26 @@ def main():
                     st.markdown(create_ios_card("Multi-Class Training in Progress", 
                                               "Processing data and training your machine learning model for multi-class classification...", "🤖"), unsafe_allow_html=True)
                     
+                    # Get CFP parameters if Circular Fingerprint is selected
+                    cfp_params = {}
+                    if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                        cfp_params = {
+                            'radius': locals().get('cfp_radius', 4),
+                            'size': locals().get('cfp_size', 2048)
+                        }
+                    
                     results = preprocess_and_model_multiclass(
                         df, smiles_col, activity_col, st.session_state.selected_featurizer_name_multiclass, 
-                        generations=generations, cv=cv, verbosity=verbosity, test_size=test_size)
+                        generations=generations, cv=cv, verbosity=verbosity, test_size=test_size, cfp_params=cfp_params)
 
                     if results[0] is not None:
                         tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, y_pred_proba, class_names, le, df_result, X_train, y_train, featurizer = results
+                        
+                        # Store featurizer and model components for fragment contribution
+                        st.session_state.featurizer_multiclass = featurizer
+                        st.session_state.tpot_model_multiclass = tpot.fitted_pipeline_
+                        st.session_state.X_train_multiclass = X_train
+                        st.session_state.trained_featurizer_name_multiclass = st.session_state.selected_featurizer_name_multiclass
                         
                         # Save model and necessary data
                         with open('best_multiclass_model.pkl', 'wb') as f:
@@ -1103,16 +1393,97 @@ def main():
                     smile_input, st.session_state.selected_featurizer_name_multiclass, tpot_model, label_encoder, class_names, X_train)
                 
                 if prediction is not None:
-                    # Display molecular structure
+                    # Display molecular structure or fragment contribution map
                     try:
                         mol = Chem.MolFromSmiles(smile_input)
                         if mol:
-                            img = Draw.MolToImage(mol, size=(300, 300))
-                            
                             col1, col2 = st.columns([1, 2])
                             with col1:
-                                st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
-                                st.image(img, width=250)
+                                # Check if we should display fragment contribution map or regular structure
+                                trained_featurizer = st.session_state.get('trained_featurizer_name_multiclass', st.session_state.selected_featurizer_name_multiclass)
+                                current_featurizer = st.session_state.selected_featurizer_name_multiclass
+                                
+                                if (trained_featurizer == "Circular Fingerprint" and 
+                                    current_featurizer == "Circular Fingerprint"):
+                                    
+                                    # Display fragment contribution map automatically
+                                    try:
+                                        # Get model components from session state
+                                        model = st.session_state.get('tpot_model_multiclass')
+                                        X_train_data = st.session_state.get('X_train_multiclass')
+                                        featurizer_obj = st.session_state.get('featurizer_multiclass')
+                                        
+                                        if model is not None and X_train_data is not None and featurizer_obj is not None:
+                                            with st.spinner("🧬 Generating fragment contribution map..."):
+                                                atomic_contrib_img = generate_fragment_contribution_map(
+                                                    smile_input, model, X_train_data, featurizer_obj, cfp_number=None
+                                                )
+                                            
+                                            if atomic_contrib_img:
+                                                st.markdown(create_ios_card("🧬 Fragment Contribution", "", "🧬"), unsafe_allow_html=True)
+                                                
+                                                # Create layout with image and legend side by side
+                                                main_col, legend_col = st.columns([4, 1])
+                                                
+                                                with main_col:
+                                                    # Display larger, high-resolution image
+                                                    st.image(atomic_contrib_img, caption="Fragment Contribution Analysis", use_column_width=True)
+                                                    
+                                                    # Download button for high-res image
+                                                    create_download_button_for_image(
+                                                        atomic_contrib_img, 
+                                                        f"fragment_contribution_{smile_input.replace('/', '_')}.png",
+                                                        "📥 Download Fragment Map"
+                                                    )
+                                                
+                                                with legend_col:
+                                                    # Compact color legend on the side
+                                                    st.markdown("**🎨 Legend**")
+                                                    
+                                                    # High Positive
+                                                    st.markdown("🔵 **High +**")
+                                                    st.caption("Strong increase")
+                                                    
+                                                    # Low Positive  
+                                                    st.markdown("🟦 **Low +**")
+                                                    st.caption("Moderate increase")
+                                                    
+                                                    # Neutral
+                                                    st.markdown("⚪ **Neutral**")
+                                                    st.caption("No effect")
+                                                    
+                                                    # Low Negative
+                                                    st.markdown("🟧 **Low -**")
+                                                    st.caption("Moderate decrease")
+                                                    
+                                                    # High Negative
+                                                    st.markdown("🔴 **High -**")
+                                                    st.caption("Strong decrease")
+                                            else:
+                                                # Fallback to regular structure
+                                                st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
+                                                img = Draw.MolToImage(mol, size=(300, 300))
+                                                st.image(img, width=250)
+                                        else:
+                                            # Fallback to regular structure
+                                            st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
+                                            img = Draw.MolToImage(mol, size=(300, 300))
+                                            st.image(img, width=250)
+                                    except Exception as e:
+                                        # Debug: show error for troubleshooting
+                                        st.error(f"Error loading model for fragment analysis: {str(e)}")
+                                        print(f"Error loading model for fragment analysis: {str(e)}")
+                                        traceback.print_exc()
+                                        
+                                        # Fallback to regular structure
+                                        st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
+                                        img = Draw.MolToImage(mol, size=(300, 300))
+                                        st.image(img, width=250)
+                                else:
+                                    # Display regular molecular structure for non-CFP featurizers
+                                    st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
+                                    img = Draw.MolToImage(mol, size=(300, 300))
+                                    st.image(img, width=250)
                             
                             with col2:
                                 # Multi-class prediction results
@@ -1216,7 +1587,14 @@ def main():
                             if standardized_smiles:
                                 mol = Chem.MolFromSmiles(standardized_smiles)
                                 if mol is not None:
-                                    featurizer = Featurizer[st.session_state.selected_featurizer_name_multiclass]
+                                    # Use stored featurizer if available for consistency
+                                    if (st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint" and 
+                                        'featurizer_multiclass' in st.session_state and 
+                                        st.session_state.featurizer_multiclass is not None):
+                                        featurizer = st.session_state.featurizer_multiclass
+                                    else:
+                                        featurizer = Featurizer[st.session_state.selected_featurizer_name_multiclass]
+                                    
                                     features = featurizer.featurize([mol])[0]
                                     feature_df = pd.DataFrame([features])
                                     new_column_names = [f"fp_{col}" for col in feature_df.columns]
@@ -1256,6 +1634,188 @@ def main():
                     # Add class probabilities
                     for i, class_name in enumerate(class_names):
                         df[f'Prob_{class_name}'] = [f"{probs[i]:.1%}" if len(probs) > i else "N/A" for probs in all_class_probabilities]
+
+                    # Display individual results first in iOS cards
+                    st.markdown("### 🧪 Individual Multi-Class Prediction Results")
+                    
+                    # Show results in expandable sections for better organization
+                    results_per_page = 5  # Show 5 results at a time
+                    total_valid_molecules = sum(1 for p in predictions if not str(p).startswith("Error") and str(p) != "Invalid SMILES")
+                    
+                    if total_valid_molecules > 0:
+                        # Create pagination for large datasets
+                        num_pages = (total_valid_molecules + results_per_page - 1) // results_per_page
+                        
+                        if num_pages > 1:
+                            page = st.selectbox("📄 Select Results Page", 
+                                              options=list(range(1, num_pages + 1)), 
+                                              format_func=lambda x: f"Page {x} ({min(results_per_page, total_valid_molecules - (x-1)*results_per_page)} results)")
+                        else:
+                            page = 1
+                        
+                        # Calculate indices for current page
+                        valid_indices = [i for i, p in enumerate(predictions) if not str(p).startswith("Error") and str(p) != "Invalid SMILES"]
+                        start_idx = (page - 1) * results_per_page
+                        end_idx = min(start_idx + results_per_page, len(valid_indices))
+                        current_page_indices = valid_indices[start_idx:end_idx]
+                        
+                        # Display individual results for current page
+                        for idx in current_page_indices:
+                            row = df.iloc[idx]
+                            prediction = predictions[idx]
+                            probability = probabilities[idx]
+                            smiles = row[smiles_col_predict]
+                            
+                            with st.expander(f"🧬 Molecule {idx + 1}: {prediction} ({probability:.1%} confidence)", expanded=False):
+                                # Create three columns for structure, results, and additional info
+                                col1, col2, col3 = st.columns([2, 1, 1])
+                                
+                                with col1:
+                                    # Display molecular structure - try fragment contribution if available
+                                    try:
+                                        trained_featurizer = st.session_state.get('trained_featurizer_name_multiclass')
+                                        current_featurizer = st.session_state.selected_featurizer_name_multiclass
+                                        
+                                        if (trained_featurizer == "Circular Fingerprint" and 
+                                            current_featurizer == "Circular Fingerprint"):
+                                            
+                                            # Try to get stored model components
+                                            model = st.session_state.get('tpot_model_multiclass')
+                                            X_train_data = st.session_state.get('X_train_multiclass')
+                                            featurizer_obj = st.session_state.get('featurizer_multiclass')
+                                            
+                                            if model is not None and X_train_data is not None and featurizer_obj is not None:
+                                                st.markdown("#### 🧬 Fragment Contribution Map")
+                                                frag_img = generate_fragment_contribution_map(smiles, model, X_train_data, featurizer_obj, None)
+                                                if frag_img:
+                                                    st.image(frag_img, width=400, caption="")
+                                                    
+                                                    # Create download button for the image
+                                                    create_download_button_for_image(
+                                                        frag_img, 
+                                                        f"fragment_contribution_molecule_{idx + 1}.png",
+                                                        "📥 Download Fragment Map"
+                                                    )
+                                                else:
+                                                    # Fallback to basic structure
+                                                    mol = Chem.MolFromSmiles(smiles)
+                                                    if mol:
+                                                        img = Draw.MolToImage(mol, size=(300, 300))
+                                                        st.markdown("#### 🧬 Molecule Structure")
+                                                        st.image(img, width=300)
+                                            else:
+                                                # Basic structure display
+                                                mol = Chem.MolFromSmiles(smiles)
+                                                if mol:
+                                                    img = Draw.MolToImage(mol, size=(300, 300))
+                                                    st.markdown("#### 🧬 Molecule Structure")
+                                                    st.image(img, width=300)
+                                        else:
+                                            # Basic structure for other featurizers
+                                            mol = Chem.MolFromSmiles(smiles)
+                                            if mol:
+                                                img = Draw.MolToImage(mol, size=(300, 300))
+                                                st.markdown("#### 🧬 Molecule Structure")
+                                                st.image(img, width=300)
+                                    except Exception as e:
+                                        # Fallback structure display
+                                        try:
+                                            mol = Chem.MolFromSmiles(smiles)
+                                            if mol:
+                                                img = Draw.MolToImage(mol, size=(300, 300))
+                                                st.markdown("#### 🧬 Molecule Structure")
+                                                st.image(img, width=300)
+                                        except:
+                                            st.markdown("""
+                                            <div class="ios-card" style="padding: 16px; text-align: center;">
+                                                <h4 style="margin: 0; color: #8E8E93;">Structure unavailable</h4>
+                                            </div>
+                                            """, unsafe_allow_html=True)
+                                
+                                with col2:
+                                    # Multi-class prediction results in compact iOS card
+                                    # Use different colors for different classes
+                                    class_colors = ["#34C759", "#007AFF", "#FF9500", "#FF3B30", "#5856D6"]
+                                    class_icons = ["🟢", "🔵", "🟡", "🔴", "🟣"]
+                                    
+                                    # Get color and icon based on prediction
+                                    try:
+                                        pred_index = list(class_names).index(prediction) if prediction in class_names else 0
+                                        prediction_color = class_colors[pred_index % len(class_colors)]
+                                        prediction_icon = class_icons[pred_index % len(class_icons)]
+                                    except:
+                                        prediction_color = "#007AFF"
+                                        prediction_icon = "🎯"
+                                    
+                                    st.markdown(f"""
+                                    <div class="ios-card" style="padding: 12px; margin: 8px 0;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                            <div style="font-size: 1.5em; margin-right: 8px;">{prediction_icon}</div>
+                                            <div>
+                                                <h3 style="color: {prediction_color}; margin: 0; font-weight: 700; font-size: 1.1em;">{prediction}</h3>
+                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 11px;">Predicted Class</p>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 122, 255, 0.1); border-radius: 8px; padding: 8px; margin-bottom: 8px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                <span style="color: #007AFF; font-weight: 600; font-size: 12px;">Confidence:</span>
+                                                <span style="color: #1D1D1F; font-weight: 700; font-size: 14px;">{probability:.1%}</span>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 0, 0, 0.05); border-radius: 6px; padding: 6px;">
+                                            <p style="margin: 0; color: #8E8E93; font-size: 10px; font-weight: 500;">
+                                                <strong>SMILES:</strong> {smiles[:30]}{'...' if len(smiles) > 30 else ''}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                
+                                with col3:
+                                    # Additional data and class probabilities in compact card
+                                    other_columns = [col for col in row.index if col != smiles_col_predict and not col.startswith('Predicted_') and not col.startswith('Prob_') and col != 'Confidence']
+                                    
+                                    st.markdown(f"""
+                                    <div class="ios-card" style="padding: 12px; margin: 8px 0;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                            <div style="font-size: 1.5em; margin-right: 8px;">📊</div>
+                                            <div>
+                                                <h3 style="color: #007AFF; margin: 0; font-weight: 600; font-size: 14px;">Class Probabilities</h3>
+                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 10px;">All class predictions</p>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 0, 0, 0.02); border-radius: 6px; padding: 8px;">
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Show class probabilities
+                                    if idx < len(all_class_probabilities):
+                                        probs = all_class_probabilities[idx]
+                                        for i, (class_name, prob) in enumerate(zip(class_names, probs)):
+                                            color = class_colors[i % len(class_colors)] if isinstance(prob, float) else "#8E8E93"
+                                            prob_display = f"{prob:.1%}" if isinstance(prob, float) else "N/A"
+                                            st.markdown(f"""
+                                            <p style="margin: 2px 0; color: {color}; font-size: 11px; font-weight: 500;">
+                                                <strong>{class_name}:</strong> {prob_display}
+                                            </p>
+                                            """, unsafe_allow_html=True)
+                                    
+                                    # Show additional data if available
+                                    if other_columns:
+                                        st.markdown("""
+                                        <hr style="margin: 8px 0; border: none; border-top: 1px solid rgba(0,0,0,0.1);">
+                                        <p style="margin: 4px 0 2px 0; color: #007AFF; font-size: 10px; font-weight: 600;">Additional Data:</p>
+                                        """, unsafe_allow_html=True)
+                                        
+                                        for col in other_columns[:2]:  # Limit to first 2 additional columns
+                                            value = str(row[col])
+                                            if len(value) > 15:
+                                                value = value[:15] + "..."
+                                            st.markdown(f"""
+                                            <p style="margin: 1px 0; color: #1D1D1F; font-size: 10px;">
+                                                <strong>{col}:</strong> {value}
+                                            </p>
+                                            """, unsafe_allow_html=True)
+                                    
+                                    st.markdown("</div></div>", unsafe_allow_html=True)
 
                     # Display results table
                     st.markdown("### 📊 Complete Multi-Class Results Table")

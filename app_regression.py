@@ -443,8 +443,6 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         # Standardize SMILES
         df[smiles_col + '_standardized'] = df[smiles_col].apply(standardize_smiles)
         df.dropna(subset=[smiles_col + '_standardized'], inplace=True)
-        
-        st.success(f"Standardized {len(df)} molecules")
 
     with st.spinner("Generating molecular features..."):
         # Featurize molecules
@@ -518,8 +516,6 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
 
         features = [features[i] for i in valid_indices]
         df = df.iloc[valid_indices].reset_index(drop=True)
-        
-        st.success(f"Generated features for {len(features)} molecules ({failed_molecules} failed)")
 
     # Create feature dataframe
     feature_df = pd.DataFrame(features)
