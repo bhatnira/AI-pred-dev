@@ -908,7 +908,7 @@ def main():
                 with col1:
                     batch_size = st.number_input("📦 Batch Size", min_value=32, max_value=512, value=256, step=32)
                     dropout = st.slider("🎛️ Dropout Rate", min_value=0.0, max_value=0.5, value=0.1, step=0.05)
-                    graph_conv_layers = st.text_input("🧠 Graph Conv Layers", value="64,64", help="Comma-separated layer sizes")
+                    graph_conv_layers = st.text_input("🧠 Graph Conv Layers", value="64,64", help="Comma-separated layer sizes", key="graph_conv_layers_multiclass")
 
                 with col2:
                     epochs = st.number_input("🔄 Number of Epochs", min_value=10, max_value=500, value=120, step=10)
@@ -1053,7 +1053,8 @@ def main():
             smiles_input = st.text_input(
                 "🧬 Enter SMILES string:",
                 placeholder="CCO",
-                help="Enter a valid SMILES representation of your molecule"
+                help="Enter a valid SMILES representation of your molecule",
+                key="smiles_input_multiclass"
             )
             
             if st.button("🔮 Predict Activity", type="primary", use_container_width=True):

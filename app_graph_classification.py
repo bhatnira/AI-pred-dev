@@ -1040,7 +1040,8 @@ def main():
         uploaded_file = st.file_uploader(
             "📁 Upload Excel file with SMILES and Activity Labels", 
             type=["xlsx"],
-            help="File should contain SMILES column and binary activity labels"
+            help="File should contain SMILES column and binary activity labels",
+            key="training_data_uploader_graph"
         )
 
         if uploaded_file is not None:
@@ -1059,21 +1060,21 @@ def main():
                 
                 with col1:
                     columns = df.columns.tolist()
-                    smiles_column = st.selectbox("🧬 Select SMILES Column", columns)
-                    label_column = st.selectbox("🎯 Select Activity Label Column", columns)
+                    smiles_column = st.selectbox("🧬 Select SMILES Column", columns, key="smiles_column_train_graph")
+                    label_column = st.selectbox("🎯 Select Activity Label Column", columns, key="label_column_train_graph")
                     
-                    batch_size = st.number_input("📦 Batch Size", min_value=32, max_value=512, value=256, step=32)
-                    dropout = st.slider("🛡️ Dropout Rate", min_value=0.0, max_value=0.5, value=0.1, step=0.05)
+                    batch_size = st.number_input("📦 Batch Size", min_value=32, max_value=512, value=256, step=32, key="batch_size_graph")
+                    dropout = st.slider("🛡️ Dropout Rate", min_value=0.0, max_value=0.5, value=0.1, step=0.05, key="dropout_rate_graph")
 
                 with col2:
-                    nb_epoch = st.number_input("🔄 Number of Epochs", min_value=10, max_value=500, value=120, step=10)
-                    graph_conv_layers = st.text_input("🧠 Graph Conv Layers", value="64,64", help="Comma-separated layer sizes")
+                    nb_epoch = st.number_input("🔄 Number of Epochs", min_value=10, max_value=500, value=120, step=10, key="nb_epoch_graph")
+                    graph_conv_layers = st.text_input("🧠 Graph Conv Layers", value="64,64", help="Comma-separated layer sizes", key="graph_conv_layers_input")
                     
-                    test_size = st.slider("📊 Test Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05)
-                    valid_size = st.slider("✅ Validation Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05)
+                    test_size = st.slider("📊 Test Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05, key="test_size_graph")
+                    valid_size = st.slider("✅ Validation Set Size", min_value=0.1, max_value=0.3, value=0.15, step=0.05, key="valid_size_graph")
 
                 # Build model button
-                if st.button("🚀 Build and Train Model", use_container_width=True):
+                if st.button("🚀 Build and Train Model", use_container_width=True, key="build_train_model_graph"):
                     if smiles_column and label_column:
                         # Convert graph_conv_layers to list of integers
                         try:
@@ -1175,7 +1176,7 @@ def main():
         # Model loading section
         if not st.session_state.model_trained:
             st.markdown("### 📁 Load Trained Model")
-            uploaded_zip = st.file_uploader("Upload model zip file", type=['zip'])
+            uploaded_zip = st.file_uploader("Upload model zip file", type=['zip'], key="model_zip_uploader_graph")
             
             if uploaded_zip is not None:
                 try:
@@ -1206,10 +1207,11 @@ def main():
             smiles_input = st.text_input(
                 "🧬 Enter SMILES string", 
                 placeholder="e.g., CCO (ethanol)",
-                help="Enter a valid SMILES notation for the molecule you want to predict"
+                help="Enter a valid SMILES notation for the molecule you want to predict",
+                key="smiles_input_predict_graph"
             )
 
-            if st.button("🔮 Predict Activity & Show Contributions", use_container_width=True):
+            if st.button("🔮 Predict Activity & Show Contributions", use_container_width=True, key="predict_single_molecule_graph"):
                 if smiles_input:
                     with st.spinner("🧬 Analyzing molecule and generating contribution map..."):
                         try:
@@ -1473,10 +1475,11 @@ def main():
                 include_contrib_maps = st.checkbox(
                     "🗺️ Include Atomic Contribution Maps", 
                     value=False,
-                    help="Generate contribution maps for each molecule (slower but more detailed)"
+                    help="Generate contribution maps for each molecule (slower but more detailed)",
+                    key="include_contrib_maps_graph"
                 )
 
-                if st.button("🚀 Run Batch Prediction", use_container_width=True):
+                if st.button("🚀 Run Batch Prediction", use_container_width=True, key="run_batch_prediction_graph"):
                     predictions = []
                     progress_bar = st.progress(0)
                     status_text = st.empty()
