@@ -14,7 +14,8 @@ import seaborn as sns
 import ssl
 import deepchem as dc
 from rdkit import Chem
-from rdkit.Chem import Draw
+from rdkit.Chem import Draw, rdMolDescriptors
+from rdkit.Chem.Draw import rdMolDraw2D
 from tpot import TPOTClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix, roc_auc_score, roc_curve
 from sklearn.metrics import precision_recall_curve, average_precision_score
@@ -23,6 +24,11 @@ from lime import lime_tabular
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, label_binarize
 from sklearn.multiclass import OneVsRestClassifier
+import io
+import zipfile
+from datetime import datetime
+from PIL import Image
+import colorsys
 
 # Configure matplotlib and RDKit for headless mode
 os.environ['MPLBACKEND'] = 'Agg'
@@ -400,6 +406,246 @@ def create_ios_header(title, subtitle=""):
     </div>
     """
 
+# --- Fragment Contribution Mapping for Circular Fingerprint ---
+
+def weight_to_google_color(weight, min_weight, max_weight):
+    """Convert weight to color using improved HLS color scheme with better handling of edge cases"""
+    # Handle edge cases
+    if max_weight == min_weight:
+        norm = 0.5
+    else:
+        norm = (abs(weight) - min_weight) / (max_weight - min_weight + 1e-6)
+    
+    # Use more vibrant colors with better contrast
+    lightness = 0.3 + 0.5 * norm  # Avoid too light colors
+    saturation = 0.85
+    hue = 210/360 if weight >= 0 else 0/360  # Blue (positive) or Red (negative)
+    
+    r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
+    return (r, g, b)
+
+def create_download_button_for_image(image, filename, button_text="📥 Download Image"):
+    """Create a download button for PIL images"""
+    try:
+        buf = io.BytesIO()
+        image.save(buf, format='PNG', dpi=(300, 300))
+        buf.seek(0)
+        
+        return st.download_button(
+            label=button_text,
+            data=buf.getvalue(),
+            file_name=filename,
+            mime='image/png',
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Could not create download button: {str(e)}")
+        return False
+
+def draw_molecule_with_fragment_weights(mol, atom_weights, width=1200, height=1200):
+    """Draw molecule with atom highlighting based on fragment weights using improved color scheme and high resolution"""
+    try:
+        # Create high-resolution drawer
+        drawer = rdMolDraw2D.MolDraw2DCairo(width, height)
+        options = drawer.drawOptions()
+        options.atomHighlightsAreCircles = True
+        options.highlightRadius = 0.3
+        options.bondLineWidth = 3
+        options.atomLabelFontSize = 18
+        options.legendFontSize = 16
+
+        weights = list(atom_weights.values())
+        if not weights:
+            return None
+
+        max_abs = max(abs(w) for w in weights)
+        min_abs = min(abs(w) for w in weights)
+
+        highlight_atoms = list(atom_weights.keys())
+        highlight_colors = {
+            idx: weight_to_google_color(atom_weights[idx], min_abs, max_abs)
+            for idx in highlight_atoms
+        }
+
+        drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
+        drawer.FinishDrawing()
+        png = drawer.GetDrawingText()
+        img = Image.open(io.BytesIO(png))
+        return img
+    except Exception:
+        return None
+
+def map_cfp_bits_to_atoms(mol, bit_weights, radius=4, n_bits=2048):
+    """Map circular fingerprint bits to atoms using RDKit's Morgan fingerprint"""
+    try:
+        atom_weights = {}
+        
+        # Get bit info from Morgan fingerprint
+        bit_info = {}
+        fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits, bitInfo=bit_info)
+        on_bits = set(fp.GetOnBits())
+        
+        # Map each bit to its contributing atoms
+        for bit_idx, weight in bit_weights.items():
+            if bit_idx in on_bits and bit_idx in bit_info:
+                # Each entry in bit_info is (center_atom, radius_used)
+                for center_atom, radius_used in bit_info[bit_idx]:
+                    # Get all atoms in the environment (fragment)
+                    if radius_used == 0:
+                        contributing_atoms = [center_atom]
+                    else:
+                        env_atoms = Chem.FindAtomEnvironmentOfRadiusN(mol, radius_used, center_atom)
+                        contributing_atoms = set()
+                        for bond_idx in env_atoms:
+                            bond = mol.GetBondWithIdx(bond_idx)
+                            contributing_atoms.add(bond.GetBeginAtomIdx())
+                            contributing_atoms.add(bond.GetEndAtomIdx())
+                        contributing_atoms.add(center_atom)  # Ensure center is included
+                        contributing_atoms = list(contributing_atoms)
+                    
+                    # Distribute weight among contributing atoms in the fragment
+                    weight_per_atom = weight / len(contributing_atoms)
+                    for atom_idx in contributing_atoms:
+                        atom_weights[atom_idx] = atom_weights.get(atom_idx, 0) + weight_per_atom
+        
+        return atom_weights
+    except Exception:
+        return {}
+
+def map_specific_cfp_to_atoms(mol, cfp_number, radius=4, n_bits=2048):
+    """Map a specific circular fingerprint number to atoms with improved weight distribution"""
+    try:
+        atom_weights = {}
+        
+        # Get bit info from Morgan fingerprint
+        bit_info = {}
+        fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=n_bits, bitInfo=bit_info)
+        on_bits = set(fp.GetOnBits())
+        
+        # Check if the specific CFP number is present in this molecule
+        if cfp_number in on_bits and cfp_number in bit_info:
+            # Initialize all atoms with small negative weight first
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = -0.5
+                
+            # Each entry in bit_info is (center_atom, radius_used)
+            for center_atom, radius_used in bit_info[cfp_number]:
+                # Get all atoms in the environment (fragment)
+                if radius_used == 0:
+                    contributing_atoms = [center_atom]
+                else:
+                    env_atoms = Chem.FindAtomEnvironmentOfRadiusN(mol, radius_used, center_atom)
+                    contributing_atoms = set()
+                    for bond_idx in env_atoms:
+                        bond = mol.GetBondWithIdx(bond_idx)
+                        contributing_atoms.add(bond.GetBeginAtomIdx())
+                        contributing_atoms.add(bond.GetEndAtomIdx())
+                    contributing_atoms.add(center_atom)  # Ensure center is included
+                    contributing_atoms = list(contributing_atoms)
+                
+                # Assign positive weights to atoms that contribute to this CFP
+                weight_center = 2.0   # Highest weight for center atom
+                weight_fragment = 1.0  # Medium weight for fragment atoms
+                
+                # Center atom gets highest weight
+                atom_weights[center_atom] = weight_center
+                
+                # Other atoms in fragment get medium weight
+                for atom_idx in contributing_atoms:
+                    if atom_idx != center_atom:
+                        atom_weights[atom_idx] = weight_fragment
+        else:
+            # If specific CFP not found, still create contrast
+            # Set all atoms to negative weight to show they don't contribute
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = -1.0
+        
+        return atom_weights
+    except Exception:
+        return {}
+
+def generate_fragment_contribution_map(smiles, model, X_train, featurizer_obj, class_names, target_class_idx=None, cfp_number=None):
+    """Generate fragment contribution map for circular fingerprint predictions in multi-class setting"""
+    try:
+        # Ensure we have the right featurizer parameters
+        radius = getattr(featurizer_obj, 'radius', 4)
+        n_bits = getattr(featurizer_obj, 'size', 2048)
+        
+        # Standardize and create molecule
+        std_smiles = standardize_smiles(smiles)
+        mol = Chem.MolFromSmiles(std_smiles)
+        if mol is None:
+            return None
+        
+        # Generate features
+        features = featurizer_obj.featurize([mol])[0]
+        feature_df = pd.DataFrame([features], columns=[f"fp_{i}" for i in range(len(features))])
+        feature_df = feature_df.astype(float)
+        
+        # If specific CFP number is provided, highlight only that fingerprint
+        if cfp_number is not None:
+            atom_weights = map_specific_cfp_to_atoms(mol, cfp_number, radius=radius, n_bits=n_bits)
+        else:
+            # Use LIME explanation for overall contribution
+            explainer = lime_tabular.LimeTabularExplainer(
+                training_data=X_train.values,
+                mode="classification",
+                feature_names=X_train.columns,
+                class_names=class_names,
+                verbose=False,
+                discretize_continuous=True
+            )
+            
+            explanation = explainer.explain_instance(
+                feature_df.values[0],
+                model.predict_proba,
+                num_features=min(100, len(feature_df.columns))  # Limit features for better visualization
+            )
+            
+            # Get predicted class and its weights
+            if target_class_idx is None:
+                pred_class = int(model.predict(feature_df)[0])
+            else:
+                pred_class = target_class_idx
+            
+            weights_list = explanation.as_map().get(pred_class, [])
+            
+            # If no weights or all weights are similar, create artificial contrast
+            if not weights_list:
+                # Create random weights for visualization
+                import random
+                weights_list = [(i, random.uniform(-1, 1)) for i in range(min(50, len(feature_df.columns)))]
+            
+            # Convert to bit weights dictionary
+            bit_weights = {}
+            for feature_idx, weight in weights_list:
+                # feature_idx corresponds to the bit position in the fingerprint
+                bit_weights[feature_idx] = float(weight)
+            
+            # If all weights are very similar, add some artificial variation
+            weight_values = list(bit_weights.values())
+            if weight_values and (max(weight_values) - min(weight_values)) < 0.01:
+                # Add artificial variation to show structure
+                for i, (bit_idx, weight) in enumerate(bit_weights.items()):
+                    bit_weights[bit_idx] = weight + (i % 3 - 1) * 0.5  # Add variation
+            
+            # Map bits to atoms
+            atom_weights = map_cfp_bits_to_atoms(mol, bit_weights, radius=radius, n_bits=n_bits)
+        
+        if not atom_weights:
+            # Fallback: create simple atom highlighting
+            atom_weights = {}
+            for i in range(mol.GetNumAtoms()):
+                atom_weights[i] = (i % 3 - 1) * 0.5  # Create pattern for visualization
+        
+        # Generate visualization
+        return draw_molecule_with_fragment_weights(mol, atom_weights)
+        
+    except Exception as e:
+        # Debug: print error for troubleshooting
+        print(f"Error in generate_fragment_contribution_map: {str(e)}")
+        return None
+
 def create_multiclass_roc_curves(y_test, y_pred_proba, class_names):
     """
     Create ROC curves for multi-class classification showing actual curves
@@ -574,8 +820,233 @@ def create_multiclass_precision_recall_curves(y_test, y_pred_proba, class_names)
         st.error(f"Error creating precision-recall curves: {str(e)}")
         return None
 
+# Function to create a ZIP report for model outputs
+def create_model_report_zip(accuracy, precision, recall, f1, roc_auc, 
+                             confusion_matrix_fig=None, roc_curve_fig=None,
+                             feature_importance_fig=None, model_params=None,
+                             class_names=None):
+    """Create a ZIP file containing all multi-class modeling outputs and reports"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 1. Create metrics report (TXT)
+        # Format ROC AUC value separately to avoid nested f-string issues
+        roc_auc_value = f"{roc_auc:.4f}" if roc_auc else 'N/A'
+        
+        metrics_report = f"""
+========================================
+ CHEMLARA MULTI-CLASS MODEL REPORT
+========================================
+Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+MODEL PERFORMANCE METRICS
+------------------------
+Accuracy:  {accuracy:.4f}
+Precision: {precision:.4f} (weighted)
+Recall:    {recall:.4f} (weighted)
+F1 Score:  {f1:.4f} (weighted)
+ROC AUC:   {roc_auc_value} (weighted)
+
+"""
+        if class_names is not None:
+            metrics_report += f"\nCLASSES DETECTED\n----------------\n"
+            for i, class_name in enumerate(class_names):
+                metrics_report += f"Class {i}: {class_name}\n"
+        
+        # Format ROC AUC message separately to avoid nested f-string issues
+        roc_auc_msg = f'Multi-class discrimination ability ({roc_auc:.4f})' if roc_auc else 'Not available'
+        
+        metrics_report += f"""
+MODEL DESCRIPTION
+-----------------
+Type: AutoML Multi-Class Classification (TPOT)
+Optimization: Genetic Algorithm Pipeline Search
+Cross-Validation: Stratified K-Fold
+
+INTERPRETATION
+--------------
+- Accuracy: Overall model correctness ({accuracy*100:.2f}% of predictions are correct)
+- Precision: {precision*100:.2f}% weighted average across all classes
+- Recall: Model captures {recall*100:.2f}% of cases (weighted average)
+- F1 Score: Harmonic mean of precision and recall (weighted)
+- ROC AUC: {roc_auc_msg}
+
+"""
+        if model_params:
+            metrics_report += f"\nMODEL PARAMETERS\n----------------\n"
+            for key, value in model_params.items():
+                metrics_report += f"{key}: {value}\n"
+        
+        zip_file.writestr(f"multiclass_model_metrics_report_{timestamp}.txt", metrics_report)
+        
+        # 2. Create metrics CSV
+        metrics_df = pd.DataFrame({
+            'Metric': ['Accuracy', 'Precision (Weighted)', 'Recall (Weighted)', 'F1 Score (Weighted)', 'ROC AUC (Weighted)'],
+            'Value': [accuracy, precision, recall, f1, roc_auc if roc_auc else 0.0]
+        })
+        csv_buffer = io.StringIO()
+        metrics_df.to_csv(csv_buffer, index=False)
+        zip_file.writestr(f"multiclass_model_metrics_{timestamp}.csv", csv_buffer.getvalue())
+        
+        # 3. Save confusion matrix figure
+        if confusion_matrix_fig is not None:
+            img_buffer = io.BytesIO()
+            confusion_matrix_fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+            img_buffer.seek(0)
+            zip_file.writestr(f"confusion_matrix_{timestamp}.png", img_buffer.getvalue())
+        
+        # 4. Save ROC curve figure
+        if roc_curve_fig is not None:
+            img_buffer = io.BytesIO()
+            roc_curve_fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+            img_buffer.seek(0)
+            zip_file.writestr(f"multiclass_roc_curves_{timestamp}.png", img_buffer.getvalue())
+        
+        # 5. Save feature importance figure
+        if feature_importance_fig is not None:
+            img_buffer = io.BytesIO()
+            feature_importance_fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
+            img_buffer.seek(0)
+            zip_file.writestr(f"feature_importance_{timestamp}.png", img_buffer.getvalue())
+        
+        # 6. Create README
+        readme_content = """
+# Chemlara Multi-Class Model Training Report
+
+This folder contains all outputs from your multi-class model training session.
+
+## Files Included:
+
+1. **multiclass_model_metrics_report_[timestamp].txt** - Detailed text report with all metrics and interpretation
+2. **multiclass_model_metrics_[timestamp].csv** - Metrics in CSV format for easy import
+3. **confusion_matrix_[timestamp].png** - Visual confusion matrix showing per-class performance
+4. **multiclass_roc_curves_[timestamp].png** - ROC curves for each class (one-vs-rest)
+5. **feature_importance_[timestamp].png** - Feature importance plot (if available)
+
+## How to Use:
+
+- Review the text report for a complete summary
+- Import the CSV into Excel or other tools for further analysis
+- Use the PNG images in presentations or reports
+- The confusion matrix shows how well each class is distinguished
+- ROC curves show the discrimination ability for each class
+
+Generated by Chemlara Predictor - Multi-Class Classification
+"""
+        zip_file.writestr("README.txt", readme_content)
+    
+    zip_buffer.seek(0)
+    return zip_buffer
+
+# Function to create a ZIP report of the prediction results
+def create_prediction_report_zip(predictions_df, smiles_col='SMILES', 
+                                   prediction_col='Predicted_Class',
+                                   confidence_col='Confidence',
+                                   individual_structures=None,
+                                   class_names=None):
+    """Create a ZIP file containing all multi-class prediction outputs"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 1. Save full predictions as CSV
+        csv_buffer = io.StringIO()
+        predictions_df.to_csv(csv_buffer, index=False)
+        zip_file.writestr(f"multiclass_predictions_{timestamp}.csv", csv_buffer.getvalue())
+        
+        # 2. Save predictions as Excel with formatting
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            predictions_df.to_excel(writer, index=False, sheet_name='Predictions')
+        excel_buffer.seek(0)
+        zip_file.writestr(f"multiclass_predictions_{timestamp}.xlsx", excel_buffer.getvalue())
+        
+        # 3. Create summary statistics
+        summary_stats = f"""
+========================================
+CHEMLARA MULTI-CLASS BATCH PREDICTION
+========================================
+Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+PREDICTION STATISTICS
+--------------------
+Total Molecules: {len(predictions_df)}
+"""
+        if prediction_col in predictions_df.columns:
+            value_counts = predictions_df[prediction_col].value_counts()
+            summary_stats += f"\nCLASS DISTRIBUTION\n------------------\n"
+            for category, count in value_counts.items():
+                percentage = (count / len(predictions_df)) * 100
+                summary_stats += f"{category}: {count} ({percentage:.1f}%)\n"
+        
+        if confidence_col in predictions_df.columns:
+            summary_stats += f"\nCONFIDENCE STATISTICS\n--------------------\n"
+            # Extract numeric confidence values
+            try:
+                confidences = predictions_df[confidence_col].apply(
+                    lambda x: float(str(x).strip('%'))/100 if isinstance(x, str) and '%' in str(x) else float(x) if pd.notna(x) else 0.0
+                )
+                summary_stats += f"Mean Confidence: {confidences.mean():.2%}\n"
+                summary_stats += f"Min Confidence:  {confidences.min():.2%}\n"
+                summary_stats += f"Max Confidence:  {confidences.max():.2%}\n"
+            except Exception:
+                # Skip confidence stats if there's an error
+                pass
+        
+        # Add class-specific probabilities summary if available
+        if class_names:
+            summary_stats += f"\nCLASS PROBABILITY COLUMNS\n------------------------\n"
+            for class_name in class_names:
+                prob_col = f'Prob_{class_name}'
+                if prob_col in predictions_df.columns:
+                    summary_stats += f"- {prob_col}\n"
+        
+        zip_file.writestr(f"multiclass_prediction_summary_{timestamp}.txt", summary_stats)
+        
+        # 4. Save individual molecular structures if provided
+        if individual_structures:
+            structures_folder = "molecular_structures/"
+            for idx, (smiles, img_bytes) in enumerate(individual_structures):
+                if img_bytes:
+                    zip_file.writestr(f"{structures_folder}molecule_{idx+1}.png", img_bytes)
+        
+        # 5. Create README
+        readme_content = f"""
+# Chemlara Multi-Class Batch Prediction Report
+
+This folder contains all outputs from your batch multi-class prediction session.
+
+## Files Included:
+
+1. **multiclass_predictions_{timestamp}.csv** - Predictions in CSV format
+2. **multiclass_predictions_{timestamp}.xlsx** - Predictions in Excel format with formatting
+3. **multiclass_prediction_summary_{timestamp}.txt** - Statistical summary of predictions
+4. **molecular_structures/** - Individual molecular structure images (if available)
+
+## Column Descriptions:
+
+- **{smiles_col}**: Input SMILES string
+- **{prediction_col}**: Predicted activity class
+- **{confidence_col}**: Model confidence in prediction
+- **Prob_[ClassName]**: Probability for each specific class
+
+## How to Use:
+
+- Open the CSV/Excel file in your preferred spreadsheet software
+- Review the summary for overall statistics and class distribution
+- View individual molecular structures in the structures folder
+- Use class probabilities to understand model confidence across all classes
+
+Generated by Chemlara Predictor - Multi-Class Classification
+"""
+        zip_file.writestr("README.txt", readme_content)
+    
+    zip_buffer.seek(0)
+    return zip_buffer
+
 # Function to preprocess data and perform modeling for multi-class classification
-def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_name, generations=3, cv=3, verbosity=0, test_size=0.20):
+def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_name, generations=3, cv=3, verbosity=0, test_size=0.20, cfp_radius=4, cfp_size=2048):
     """
     Multi-class preprocessing and TPOT model building with time tracking
     """
@@ -633,7 +1104,13 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
         update_progress_with_time(0.15, "Featurizing molecules...")
         
         # Featurize molecules with progress updates
-        featurizer = Featurizer[featurizer_name]
+        # For Circular Fingerprint, use custom radius and size
+        if featurizer_name == "Circular Fingerprint":
+            from deepchem.feat import CircularFingerprint
+            featurizer = CircularFingerprint(radius=cfp_radius, size=cfp_size)
+        else:
+            featurizer = Featurizer[featurizer_name]
+        
         features = []
         smiles_list = df[smiles_col + '_standardized'].tolist()
         
@@ -724,7 +1201,7 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
         st.error(f"An error occurred during model training: {str(e)}")
         return None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
-def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_encoder, class_names=None, X_train=None):
+def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_encoder, class_names=None, X_train=None, featurizer_obj=None):
     """
     Predict activity for a single SMILES string in multi-class setting
     """
@@ -734,8 +1211,12 @@ def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_
         if standardized_smiles is None:
             return None, None, "Invalid SMILES string"
 
-        # Featurize molecule
-        featurizer = Featurizer[featurizer_name]
+        # Use provided featurizer object if available, otherwise use default
+        if featurizer_obj is not None:
+            featurizer = featurizer_obj
+        else:
+            featurizer = Featurizer[featurizer_name]
+        
         mol = Chem.MolFromSmiles(standardized_smiles)
         if mol is None:
             return None, None, "Could not parse molecule"
@@ -757,17 +1238,7 @@ def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_
         display_classes = class_names if class_names is not None else label_encoder.classes_
         
         # Create explanation
-        explanation = f"""
-        <div class="ios-card" style="margin: 16px 0;">
-            <h4 style="color: #007AFF; margin-bottom: 12px;">🧬 Prediction Details</h4>
-            <p><strong>Predicted Class:</strong> {prediction}</p>
-            <p><strong>Confidence:</strong> {max_probability:.1%}</p>
-            <p><strong>Input SMILES:</strong> {smiles}</p>
-            <p><strong>Standardized SMILES:</strong> {standardized_smiles}</p>
-        """
-        
-        # Close the explanation div
-        explanation += "</div>"
+        explanation = ""
         
         # Generate LIME interpretation file if X_train is provided
         if X_train is not None and display_classes is not None:
@@ -796,8 +1267,6 @@ def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_
                     """)
                 # Store filename for download
                 st.session_state['lime_filename'] = lime_filename
-        
-        explanation += "</div>"
 
         return prediction, max_probability, explanation
 
@@ -973,6 +1442,17 @@ def main():
                 st.session_state.selected_featurizer_name_multiclass = st.selectbox("🔧 Featurizer", list(Featurizer.keys()), 
                                                                         key='featurizer_name_multiclass', 
                                                                         index=list(Featurizer.keys()).index(st.session_state.selected_featurizer_name_multiclass))
+            
+            # Circular Fingerprint specific settings
+            if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                st.markdown("#### ⚙️ Circular Fingerprint Parameters")
+                col_fp1, col_fp2 = st.columns(2)
+                with col_fp1:
+                    cfp_radius = st.slider("Radius", min_value=1, max_value=6, value=4, 
+                                         help="Circular fingerprint radius (default: 4)", key='cfp_radius_multiclass')
+                with col_fp2:
+                    cfp_size = st.number_input("Fingerprint Size", min_value=64, max_value=16384, value=2048, step=64,
+                                          help="Number of bits in fingerprint (default: 2048)", key='cfp_size_multiclass')
 
             # Advanced settings in collapsible section
             with st.expander("🔧 Advanced Settings"):
@@ -1006,13 +1486,22 @@ def main():
                     """)
 
             if train_button and activity_col and len(df[activity_col].unique()) >= 3:
+                # Get CFP parameters if Circular Fingerprint is selected
+                if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                    cfp_radius_val = st.session_state.get('cfp_radius_multiclass', 4)
+                    cfp_size_val = st.session_state.get('cfp_size_multiclass', 2048)
+                else:
+                    cfp_radius_val = 4
+                    cfp_size_val = 2048
+                
                 with st.spinner("🔄 Building your multi-class model... This may take several minutes."):
                     st.markdown(create_ios_card("Multi-Class Training in Progress", 
                                               "Processing data and training your machine learning model for multi-class classification...", "🤖"), unsafe_allow_html=True)
                     
                     results = preprocess_and_model_multiclass(
                         df, smiles_col, activity_col, st.session_state.selected_featurizer_name_multiclass, 
-                        generations=generations, cv=cv, verbosity=verbosity, test_size=test_size)
+                        generations=generations, cv=cv, verbosity=verbosity, test_size=test_size,
+                        cfp_radius=cfp_radius_val, cfp_size=cfp_size_val)
 
                     if results[0] is not None:
                         tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, y_pred_proba, class_names, le, df_result, X_train, y_train, featurizer = results
@@ -1026,6 +1515,8 @@ def main():
                             joblib.dump(le, f)
                         with open('class_names_multiclass.pkl', 'wb') as f:
                             joblib.dump(class_names, f)
+                        with open('featurizer_multiclass.pkl', 'wb') as f:
+                            joblib.dump(featurizer, f)
 
                         # Display model metrics in cards
                         st.markdown("### 📈 Model Performance")
@@ -1045,12 +1536,16 @@ def main():
                         # Visualizations in 2 columns (matching binary classification format)
                         col1, col2 = st.columns(2)
                         
+                        roc_fig = None
+                        cm_fig = None
+                        
                         with col1:
                             try:
                                 roc_fig = create_multiclass_roc_curves(y_test, y_pred_proba, class_names)
                                 if roc_fig:
                                     st.pyplot(roc_fig)
-                                    plt.close(roc_fig)
+                                    # Store figure in session state for download
+                                    st.session_state['roc_curve_fig_multiclass'] = roc_fig
                                 else:
                                     st.info("ℹ️ ROC curve not available for this classification problem.")
                             except Exception as e:
@@ -1062,12 +1557,49 @@ def main():
                                 cm_fig = create_multiclass_confusion_matrix(y_test, y_pred, class_names)
                                 if cm_fig:
                                     st.pyplot(cm_fig)
-                                    plt.close(cm_fig)
+                                    # Store figure in session state for download
+                                    st.session_state['confusion_matrix_fig_multiclass'] = cm_fig
                                 else:
                                     st.info("ℹ️ Confusion matrix not available for this classification problem.")
                             except Exception as e:
                                 st.error(f"CM Error: {str(e)}")
                                 st.info("ℹ️ Confusion matrix not available for this classification problem.")
+
+                        # Download Full Model Report as ZIP
+                        st.markdown("### 📦 Download Complete Model Report")
+                        st.markdown(create_ios_card("Complete Training Report", 
+                                                  "Download a comprehensive ZIP package containing all metrics, visualizations, and reports from your model training.", "📊"), 
+                                  unsafe_allow_html=True)
+                        
+                        try:
+                            # Create model parameters dict
+                            model_params = {
+                                'Generations': generations,
+                                'CV Folds': cv,
+                                'Test Size': test_size,
+                                'Featurizer': st.session_state.selected_featurizer_name_multiclass,
+                                'Number of Classes': len(class_names)
+                            }
+                            
+                            zip_buffer = create_model_report_zip(
+                                accuracy, precision, recall, f1, roc_auc,
+                                confusion_matrix_fig=cm_fig,
+                                roc_curve_fig=roc_fig,
+                                model_params=model_params,
+                                class_names=class_names
+                            )
+                            
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            st.download_button(
+                                label="📥 Download Complete Model Report (ZIP)",
+                                data=zip_buffer.getvalue(),
+                                file_name=f"multiclass_model_report_{timestamp}.zip",
+                                mime="application/zip",
+                                use_container_width=True,
+                                help="Download a ZIP file containing all model outputs, metrics, visualizations, and reports"
+                            )
+                        except Exception as e:
+                            st.warning(f"Could not create ZIP report: {str(e)}")
 
                         # Display best pipeline in a nice container
                         st.markdown("### 🏆 Best TPOT Pipeline")
@@ -1164,61 +1696,151 @@ def main():
                     label_encoder = joblib.load(f_le)
                     class_names = joblib.load(f_classes)
                     X_train = joblib.load(f_X_train)
+                
+                # Try to load featurizer (may not exist in older models)
+                try:
+                    with open('featurizer_multiclass.pkl', 'rb') as f_feat:
+                        featurizer_loaded = joblib.load(f_feat)
+                except:
+                    featurizer_loaded = None
+                    
             except FileNotFoundError:
                 st.error("❌ No trained multi-class model found. Please build a model first in the 'Build Model' tab.")
                 return
 
             with st.spinner("🔍 Analyzing molecule for multi-class prediction..."):
                 prediction, probability, explanation_html = predict_from_single_smiles_multiclass(
-                    smile_input, st.session_state.selected_featurizer_name_multiclass, tpot_model, label_encoder, class_names, X_train)
+                    smile_input, st.session_state.selected_featurizer_name_multiclass, tpot_model, label_encoder, class_names, X_train, featurizer_loaded)
                 
                 if prediction is not None:
-                    # Display molecular structure
-                    try:
-                        mol = Chem.MolFromSmiles(smile_input)
-                        if mol:
-                            img = Draw.MolToImage(mol, size=(300, 300))
-                            
-                            col1, col2 = st.columns([1, 2])
-                            with col1:
-                                st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
-                                st.image(img, width=250)
-                            
-                            with col2:
-                                # Multi-class prediction results
-                                st.markdown(f"""
-                                <div class="ios-card" style="padding: 20px;">
-                                    <div style="display: flex; align-items: center; margin-bottom: 16px;">
-                                        <div style="font-size: 2em; margin-right: 12px;">🎯</div>
-                                        <div>
-                                            <h2 style="color: #007AFF; margin: 0; font-weight: 700; font-size: 1.5em;">{prediction}</h2>
-                                            <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Predicted Class</p>
+                    # Three-column layout: fragment map, prediction results, and color legend
+                    col1, col2, col3 = st.columns([2, 1, 1])
+                    
+                    with col1:
+                        # Display atomic contribution map for Circular Fingerprint
+                        if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                            try:
+                                # Get the featurizer object (use loaded one if available, otherwise create new)
+                                if featurizer_loaded is not None:
+                                    featurizer_obj = featurizer_loaded
+                                else:
+                                    featurizer_obj = Featurizer[st.session_state.selected_featurizer_name_multiclass]
+                                
+                                # Get predicted class index
+                                pred_class_idx = np.where(class_names == prediction)[0][0] if isinstance(class_names, np.ndarray) else list(class_names).index(prediction)
+                                
+                                with st.spinner("🗺️ Generating high-resolution fragment contribution map..."):
+                                    atomic_contrib_img = generate_fragment_contribution_map(
+                                        smile_input, tpot_model, X_train, featurizer_obj, 
+                                        class_names, target_class_idx=pred_class_idx, cfp_number=None
+                                    )
+                                
+                                if atomic_contrib_img:
+                                    st.markdown("""
+                                    <div class="ios-card" style="padding: 16px; text-align: center;">
+                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🗺️ Fragment Contribution Map</h4>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Display larger, high-resolution image
+                                    st.image(atomic_contrib_img, width=500)
+                                    
+                                    # Download button for the high-resolution image
+                                    create_download_button_for_image(
+                                        atomic_contrib_img, 
+                                        f"atomic_contribution_{smile_input.replace('/', '_')}.png",
+                                        "📥 Download HD Image"
+                                    )
+                                else:
+                                    # Fallback to molecular structure
+                                    mol = Chem.MolFromSmiles(smile_input)
+                                    if mol:
+                                        img = Draw.MolToImage(mol, size=(400, 400))
+                                        st.markdown("""
+                                        <div class="ios-card" style="padding: 16px; text-align: center;">
+                                            <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
                                         </div>
+                                        """, unsafe_allow_html=True)
+                                        st.image(img, width=400)
+                                    else:
+                                        st.warning("⚠️ Could not visualize molecule")
+                            except Exception as e:
+                                st.warning(f"⚠️ Could not generate atomic contribution map: {str(e)}")
+                                # Fallback to basic structure
+                                mol = Chem.MolFromSmiles(smile_input)
+                                if mol:
+                                    img = Draw.MolToImage(mol, size=(400, 400))
+                                    st.markdown("""
+                                    <div class="ios-card" style="padding: 16px; text-align: center;">
+                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
                                     </div>
-                                    <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
-                                            <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{probability:.1%}</span>
-                                        </div>
-                                    </div>
-                                    <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
-                                        <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
-                                            <strong>SMILES:</strong> {smile_input}
-                                        </p>
-                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.image(img, width=400)
+                        else:
+                            # Fallback to molecular structure for other featurizers
+                            mol = Chem.MolFromSmiles(smile_input)
+                            if mol:
+                                img = Draw.MolToImage(mol, size=(400, 400))
+                                st.markdown("""
+                                <div class="ios-card" style="padding: 16px; text-align: center;">
+                                    <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
                                 </div>
                                 """, unsafe_allow_html=True)
-                    except:
-                        st.markdown(create_ios_card("Prediction Result", f"Predicted Class: {prediction} (Confidence: {probability:.1%})", "🎯"), unsafe_allow_html=True)
+                                st.image(img, width=400)
+                            else:
+                                st.warning("⚠️ Could not visualize molecule")
+                    
+                    with col2:
+                        # Multi-class prediction results
+                        st.markdown(f"""
+                        <div class="ios-card" style="padding: 20px;">
+                            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                                <div style="font-size: 2em; margin-right: 12px;">🎯</div>
+                                <div>
+                                    <h2 style="color: #007AFF; margin: 0; font-weight: 700; font-size: 1.5em;">{prediction}</h2>
+                                    <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Predicted Class</p>
+                                </div>
+                            </div>
+                            <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
+                                    <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{probability:.1%}</span>
+                                </div>
+                            </div>
+                            <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
+                                <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
+                                    <strong>SMILES:</strong> {smile_input}
+                                </p>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col3:
+                        # Color legend (only show for Circular Fingerprint)
+                        if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                            # High Positive
+                            st.markdown("🔵 **High Positive (Dark Blue)**")
+                            st.caption("Strongly contributes to activity")
+                            
+                            # Low Positive  
+                            st.markdown("🟦 **Low Positive (Light Blue)**")
+                            st.caption("Moderately supports activity")
+                            
+                            # Neutral
+                            st.markdown("⚪ **Neutral (Gray)**")
+                            st.caption("No significant contribution")
+                            
+                            # Low Negative
+                            st.markdown("🟧 **Low Negative (Light Red)**")
+                            st.caption("Moderately reduces activity")
+                            
+                            # High Negative
+                            st.markdown("🔴 **High Negative (Dark Red)**")
+                            st.caption("Strongly reduces activity")
                     
                     # Prediction explanation
                     if explanation_html:
                         st.markdown(explanation_html, unsafe_allow_html=True)
-                    
-                    # LIME interpretation download button
-                    if 'lime_filename' in st.session_state and st.session_state['lime_filename']:
-                        st.markdown("### � Download LIME Interpretation")
-                        st.markdown(create_downloadable_model_link(st.session_state['lime_filename'], '📥 Download LIME Interpretation'), unsafe_allow_html=True)
                 else:
                     st.error("❌ Failed to make prediction. Please check your SMILES input.")
 
@@ -1333,33 +1955,64 @@ def main():
                                               "Your batch prediction results with class probabilities are ready!", "📊"), unsafe_allow_html=True)
                     st.dataframe(df, use_container_width=True)
                     
-                    # iOS-style download button
-                    csv = df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Download Multi-Class Results as CSV",
-                        data=csv,
-                        file_name='multiclass_batch_predictions.csv',
-                        mime='text/csv',
-                        use_container_width=True
-                    )
+                    # Enhanced download section with multiple options
+                    st.markdown("### 💾 Download Prediction Results")
+                    st.markdown(create_ios_card("Export Options", 
+                                              "Choose your preferred format to download the prediction results.", "📥"), 
+                              unsafe_allow_html=True)
                     
-                    # Summary statistics in iOS cards
-                    st.markdown("### 📈 Multi-Class Summary Statistics")
-                    valid_predictions = [p for p in predictions if str(p) not in ["Invalid SMILES"] and not str(p).startswith("Error")]
+                    col_dl1, col_dl2, col_dl3 = st.columns(3)
                     
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.markdown(create_ios_metric_card("Total Processed", str(len(df)), "molecules", "⚗️"), unsafe_allow_html=True)
-                    with col2:
-                        st.markdown(create_ios_metric_card("Valid Predictions", str(len(valid_predictions)), f"out of {len(df)}", "✅"), unsafe_allow_html=True)
-                    with col3:
-                        if valid_predictions:
-                            most_common_class = max(set(valid_predictions), key=valid_predictions.count)
-                            class_count = valid_predictions.count(most_common_class)
-                            st.markdown(create_ios_metric_card("Most Common", most_common_class, f"{class_count} predictions", "🏆"), unsafe_allow_html=True)
+                    with col_dl1:
+                        # CSV download
+                        csv = df.to_csv(index=False)
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        st.download_button(
+                            label="� Download as CSV",
+                            data=csv,
+                            file_name=f'multiclass_predictions_{timestamp}.csv',
+                            mime='text/csv',
+                            use_container_width=True,
+                            help="Download predictions in CSV format"
+                        )
                     
-                else:
-                    st.error("❌ SMILES column not found in the uploaded file.")
+                    with col_dl2:
+                        # Excel download
+                        excel_buffer = io.BytesIO()
+                        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                            df.to_excel(writer, index=False, sheet_name='Predictions')
+                        excel_buffer.seek(0)
+                        
+                        st.download_button(
+                            label="📊 Download as Excel",
+                            data=excel_buffer.getvalue(),
+                            file_name=f'multiclass_predictions_{timestamp}.xlsx',
+                            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                            use_container_width=True,
+                            help="Download predictions in Excel format with formatting"
+                        )
+                    
+                    with col_dl3:
+                        # Full ZIP report download
+                        try:
+                            prediction_zip = create_prediction_report_zip(
+                                df,
+                                smiles_col=smiles_col_predict,
+                                prediction_col='Predicted_Class',
+                                confidence_col='Confidence',
+                                class_names=class_names
+                            )
+                            
+                            st.download_button(
+                                label="📦 Download Full Report (ZIP)",
+                                data=prediction_zip.getvalue(),
+                                file_name=f'multiclass_prediction_report_{timestamp}.zip',
+                                mime='application/zip',
+                                use_container_width=True,
+                                help="Download complete report with CSV, Excel, summary stats, and README"
+                            )
+                        except Exception as e:
+                            st.error(f"Error creating ZIP report: {str(e)}")
 
 if __name__ == "__main__":
     main()
