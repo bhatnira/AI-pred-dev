@@ -406,6 +406,53 @@ def create_ios_header(title, subtitle=""):
     </div>
     """
 
+def create_ios_section_title(title, emoji="", size="large"):
+    """Create iOS-style section title with gradient background"""
+    if size == "large":
+        return f"""
+        <div style="
+            background: linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(88, 86, 214, 0.1) 100%);
+            border-left: 4px solid #007AFF;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin: 24px 0 16px 0;
+        ">
+            <h3 style="
+                margin: 0;
+                color: #007AFF;
+                font-weight: 700;
+                font-size: 1.5em;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            ">
+                {emoji} {title}
+            </h3>
+        </div>
+        """
+    else:  # small/medium
+        return f"""
+        <div style="
+            background: linear-gradient(135deg, rgba(0, 122, 255, 0.08) 0%, rgba(88, 86, 214, 0.08) 100%);
+            border-left: 3px solid #007AFF;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 16px 0 12px 0;
+        ">
+            <h4 style="
+                margin: 0;
+                color: #007AFF;
+                font-weight: 600;
+                font-size: 1.2em;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            ">
+                {emoji} {title}
+            </h4>
+        </div>
+        """
+
 # --- Fragment Contribution Mapping for Circular Fingerprint ---
 
 def weight_to_google_color(weight, min_weight, max_weight):
@@ -1177,8 +1224,6 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
             roc_auc = roc_auc_score(y_test, y_pred_proba, multi_class='ovr', average='weighted')
         except:
             roc_auc = None
-
-        update_progress(1.0, "Training completed successfully!")
         
         # Calculate total elapsed time
         elapsed_time = time.time() - start_time
@@ -1376,7 +1421,7 @@ def main():
                    """, "🎉"), unsafe_allow_html=True)
 
     elif active_tab == "build":
-        st.markdown("### 🔬 Build Your Multi-Class ML Model")
+        st.markdown(create_ios_section_title("Build Your Multi-Class ML Model", "🔬"), unsafe_allow_html=True)
         
         with st.expander("� Upload Training Data", expanded=True):
             uploaded_file = st.file_uploader("Upload Excel file with SMILES and Multi-Class Activity", type=["xlsx"], 
@@ -1396,7 +1441,7 @@ def main():
                     activity_col_preview = st.selectbox("Preview Activity Column", df.columns.tolist(), key='preview_col')
                     if activity_col_preview:
                         class_counts = df[activity_col_preview].value_counts()
-                        st.markdown("#### 📈 Class Distribution")
+                        st.markdown(create_ios_section_title("Class Distribution", "📈", size="small"), unsafe_allow_html=True)
                         col1, col2 = st.columns([2, 1])
                         with col1:
                             fig, ax = plt.subplots(figsize=(6, 3))
@@ -1437,7 +1482,7 @@ def main():
             
             # Circular Fingerprint specific settings
             if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
-                st.markdown("#### ⚙️ Circular Fingerprint Parameters")
+                st.markdown(create_ios_section_title("Circular Fingerprint Parameters", "⚙️", size="small"), unsafe_allow_html=True)
                 col_fp1, col_fp2 = st.columns(2)
                 with col_fp1:
                     cfp_radius = st.slider("Radius", min_value=1, max_value=6, value=4, 
@@ -1508,10 +1553,30 @@ def main():
                             joblib.dump(featurizer, f)
 
                         # Display elapsed time
-                        st.markdown(f"### ⏱️ Training Time: {format_time_duration(elapsed_time)}")
+                        st.markdown(f"""
+                        <div style="
+                            background: linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(0, 122, 255, 0.1) 100%);
+                            border-left: 4px solid #34C759;
+                            border-radius: 12px;
+                            padding: 16px 20px;
+                            margin: 24px 0 16px 0;
+                        ">
+                            <h3 style="
+                                margin: 0;
+                                color: #34C759;
+                                font-weight: 700;
+                                font-size: 1.3em;
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                            ">
+                                ⏱️ Training Time: {format_time_duration(elapsed_time)}
+                            </h3>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         # Display model metrics in cards
-                        st.markdown("### 📈 Model Performance")
+                        st.markdown(create_ios_section_title("Model Performance", "📈"), unsafe_allow_html=True)
                         
                         col1, col2, col3 = st.columns(3)
                         with col1:
@@ -1558,7 +1623,7 @@ def main():
                                 st.info("ℹ️ Confusion matrix not available for this classification problem.")
 
                         # Display best pipeline in a nice container
-                        st.markdown("### 🏆 Best TPOT Pipeline")
+                        st.markdown(create_ios_section_title("Best TPOT Pipeline", "🏆"), unsafe_allow_html=True)
                         with st.expander("🔍 View Pipeline Details", expanded=False):
                             try:
                                 st.code(str(tpot.fitted_pipeline_), language='python')
@@ -1566,7 +1631,7 @@ def main():
                                 st.code("Pipeline details not available", language='text')
 
                         # Model download section
-                        st.markdown("### 💾 Download Trained Multi-Class Model")
+                        st.markdown(create_ios_section_title("Download Trained Multi-Class Model", "💾"), unsafe_allow_html=True)
                         
                         # Save TPOT model and related files
                         model_filename = 'best_multiclass_model.pkl'
@@ -1727,7 +1792,7 @@ def main():
                             st.warning(f"Could not save model files: {str(e)}")
 
     elif active_tab == "predict":
-        st.markdown("### 🧪 Single SMILES Multi-Class Prediction")
+        st.markdown(create_ios_section_title("Single SMILES Multi-Class Prediction", "🧪"), unsafe_allow_html=True)
         
         smile_input = st.text_input("Enter SMILES string for multi-class prediction", 
                                   placeholder="e.g., CCO (ethanol)",
@@ -1901,7 +1966,7 @@ def main():
                     st.error("❌ Failed to make prediction. Please check your SMILES input.")
 
     elif active_tab == "batch":
-        st.markdown("### 📊 Batch Multi-Class Prediction from File")
+        st.markdown(create_ios_section_title("Batch Multi-Class Prediction from File", "📊"), unsafe_allow_html=True)
         
         with st.expander("📁 Upload Prediction File", expanded=True):
             uploaded_file = st.file_uploader("Upload Excel file with SMILES for batch multi-class prediction", 
@@ -2039,7 +2104,7 @@ def main():
                         df[f'Prob_{class_name}'] = [f"{probs[i]:.1%}" if len(probs) > i else "N/A" for probs in all_class_probabilities]
 
                     # Display individual results first in iOS cards
-                    st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">🧪 Individual Prediction Results</h3>', unsafe_allow_html=True)
+                    st.markdown(create_ios_section_title("Individual Prediction Results", "🧪"), unsafe_allow_html=True)
                     
                     # Show results in expandable sections for better organization
                     results_per_page = 5  # Show 5 results at a time
@@ -2195,12 +2260,12 @@ def main():
                                         st.caption("Strongly reduces activity")
 
                     # Display results table
-                    st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">📊 Complete Multi-Class Results Table</h3>', unsafe_allow_html=True)
+                    st.markdown(create_ios_section_title("Complete Multi-Class Results Table", "📊"), unsafe_allow_html=True)
                     st.dataframe(df, use_container_width=True)
                     
                     # Download Section with ZIP file option
                     st.markdown("---")
-                    st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">📥 Download Prediction Results</h3>', unsafe_allow_html=True)
+                    st.markdown(create_ios_section_title("Download Prediction Results", "📥"), unsafe_allow_html=True)
                     
                     col_dl1, col_dl2, col_dl3 = st.columns(3)
                     
