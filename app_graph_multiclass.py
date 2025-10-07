@@ -837,6 +837,53 @@ def batch_predict_multiclass(model, smiles_list, label_encoder):
     except Exception as e:
         return None, f"Error: {str(e)}"
 
+
+# Navigation bar function
+def render_navigation_bar():
+    """Render iOS-style horizontal navigation bar"""
+    nav_options = {
+        "🏠 Home": "home",
+        "🔬 Build Model": "build", 
+        "🧪 Single Prediction": "predict",
+        "📊 Batch Prediction": "batch"
+    }
+    
+    # Initialize session state
+    if 'graph_multi_active_tab' not in st.session_state:
+        st.session_state.graph_multi_active_tab = "home"
+    
+    st.markdown("""
+    <div style="
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 12px;
+        margin: 10px 0 10px 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    ">
+    """, unsafe_allow_html=True)
+    
+    cols = st.columns(len(nav_options))
+    
+    for idx, (label, key) in enumerate(nav_options.items()):
+        with cols[idx]:
+            is_active = st.session_state.graph_multi_active_tab == key
+            
+            if st.button(
+                label,
+                key=f"graph_multi_nav_{key}",
+                help=f"Switch to {label}",
+                use_container_width=True,
+                type="primary" if is_active else "secondary"
+            ):
+                if st.session_state.graph_multi_active_tab != key:
+                    st.session_state.graph_multi_active_tab = key
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    return st.session_state.graph_multi_active_tab
+
 # Main function to run the Streamlit app
 def main():
     # Create iOS-style header
@@ -850,10 +897,10 @@ def main():
     if 'multiclass_label_encoder' not in st.session_state:
         st.session_state.multiclass_label_encoder = None
 
-    # Create tabs for mobile-friendly navigation
-    tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "🔬 Build Model", "⚗️ Predict SMILES", "📊 Batch Predict"])
+    # Render navigation and get active tab
+    active_tab = render_navigation_bar()
 
-    with tab1:
+    if active_tab == "home":
         st.markdown("## 🎯 Welcome to GraphConv Multi-Class Classifier")
         st.markdown("Leverage Graph Convolutional Networks for multi-class molecular activity classification with interpretable results.")
         
@@ -874,7 +921,7 @@ def main():
             st.markdown("• **SMILES Validation** - Chemical structure checks")
             st.markdown("• **Training Visualization** - Loss and accuracy curves")
 
-    with tab2:
+    elif active_tab == "build":
         st.markdown("## 🔬 Build Multi-Class Model")
         
         uploaded_file = st.file_uploader(
@@ -1044,7 +1091,7 @@ def main():
             except Exception as e:
                 st.error(f"❌ Error loading dataset: {str(e)}")
 
-    with tab3:
+    elif active_tab == "predict":
         st.markdown("## ⚗️ Predict Single SMILES")
         
         if not st.session_state.multiclass_model_trained:
@@ -1112,7 +1159,7 @@ def main():
                 else:
                     st.warning("⚠️ Please enter a SMILES string.")
 
-    with tab4:
+    elif active_tab == "batch":
         st.markdown("## 📊 Batch Predict")
         
         if not st.session_state.multiclass_model_trained:

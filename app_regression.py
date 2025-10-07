@@ -83,27 +83,50 @@ st.markdown("""
     
     /* Apple-style buttons */
     .stButton > button {
-        background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
-        color: white;
-        border-radius: 12px;
-        border: none;
-        padding: 14px 20px;
-        font-weight: 600;
-        font-size: 16px;
-        transition: all 0.2s ease;
+        background: rgba(255, 255, 255, 0.7) !important;
+        color: #333 !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        padding: 14px 20px !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        transition: all 0.3s ease !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
         width: 100%;
-        box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
     }
     
     .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 122, 255, 0.4);
-        background: linear-gradient(135deg, #0056D3 0%, #4A44C4 100%);
+        transform: translateY(-4px) !important;
+        box-shadow: 0 12px 40px rgba(0, 122, 255, 0.2) !important;
+        background: rgba(255, 255, 255, 0.9) !important;
     }
     
     .stButton > button:active {
-        transform: translateY(0px);
-        box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(0, 122, 255, 0.3) !important;
+    }
+    
+    /* Active navigation button */
+    div[data-testid="column"] button[kind="primary"] {
+        background: linear-gradient(135deg, #007AFF, #5856D6) !important;
+        color: white !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(0, 122, 255, 0.4) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    }
+    
+    div[data-testid="column"] button[kind="primary"]:hover {
+        transform: translateY(-4px) !important;
+        box-shadow: 0 12px 35px rgba(0, 122, 255, 0.5) !important;
+    }
+    
+    /* Fallback for buttons without backdrop-filter support */
+    @supports not (backdrop-filter: blur(10px)) {
+        .stButton > button {
+            background: rgba(255, 255, 255, 0.95) !important;
+        }
     }
     
     /* iOS Input fields */
@@ -1024,6 +1047,52 @@ def generate_fragment_contribution_map(smiles, model, X_train, featurizer_obj, c
         traceback.print_exc()
         return None
 
+# Navigation bar function
+def render_navigation_bar():
+    """Render iOS-style horizontal navigation bar"""
+    nav_options = {
+        "🏠 Home": "home",
+        "🔬 Build Model": "build", 
+        "🧪 Single Prediction": "predict",
+        "📊 Batch Prediction": "batch"
+    }
+    
+    # Initialize session state
+    if 'reg_active_tab' not in st.session_state:
+        st.session_state.reg_active_tab = "home"
+    
+    st.markdown("""
+    <div style="
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 12px;
+        margin: 10px 0 10px 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    ">
+    """, unsafe_allow_html=True)
+    
+    cols = st.columns(len(nav_options))
+    
+    for idx, (label, key) in enumerate(nav_options.items()):
+        with cols[idx]:
+            is_active = st.session_state.reg_active_tab == key
+            
+            if st.button(
+                label,
+                key=f"reg_nav_{key}",
+                help=f"Switch to {label}",
+                use_container_width=True,
+                type="primary" if is_active else "secondary"
+            ):
+                if st.session_state.reg_active_tab != key:
+                    st.session_state.reg_active_tab = key
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    return st.session_state.reg_active_tab
+
 # Main function to run the Streamlit app
 def main():
     # Initialize featurizers to avoid import scope issues
@@ -1038,10 +1107,10 @@ def main():
     # Create main header
     st.markdown(create_ios_header("Chemlara Regressor", "AI-Powered Molecular Property Prediction"), unsafe_allow_html=True)
 
-    # Mobile-friendly navigation using tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "🔬 Build Model", "🧪 Single Prediction", "📊 Batch Prediction"])
+    # Render navigation and get active tab
+    active_tab = render_navigation_bar()
 
-    with tab1:
+    if active_tab == "home":
         st.markdown(create_ios_card("Welcome to Chemlara Regressor!", 
                    """
                    <p style="font-size: 16px; margin-bottom: 16px;">🎯 <strong>What can you do here?</strong></p>
@@ -1055,7 +1124,7 @@ def main():
                    <p style="color: #8E8E93; font-style: italic; text-align: center;">📱 Optimized for mobile and desktop use!</p>
                    """, "🎉"), unsafe_allow_html=True)
 
-    with tab2:
+    elif active_tab == "build":
         st.markdown("### 🔬 Build Your Regression Model")
         
         # Data format guide
@@ -1202,7 +1271,7 @@ def main():
             except Exception as e:
                 st.error(f"Error reading file: {str(e)}")
 
-    with tab3:
+    elif active_tab == "predict":
         st.markdown("### 🧪 Single Molecule Prediction")
         
         # Check if model is trained
@@ -1404,7 +1473,7 @@ def main():
                                    <p><strong>Featurizer:</strong> {st.session_state.selected_featurizer_name}</p>
                                    """, "ℹ️"), unsafe_allow_html=True)
                         
-    with tab4:
+    elif active_tab == "batch":
         st.markdown("### 📊 Batch Prediction")
         
         # Check if model is trained

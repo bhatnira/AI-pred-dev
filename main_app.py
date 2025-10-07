@@ -41,7 +41,7 @@ st.markdown("""
     
     /* Main container */
     .main .block-container {
-        max-width: 450px;
+        max-width: 100% !important;
         padding: 0.5rem 0.8rem;
         background: transparent;
         margin: 0 auto;
@@ -169,7 +169,7 @@ st.markdown("""
     
     /* Main content area */
     .main-content {
-        max-width: 400px;
+        max-width: 100% !important;
         margin: 0 auto;
         padding: 4px 8px;
         min-height: auto;
@@ -177,7 +177,7 @@ st.markdown("""
     
     /* Home page specific styling */
     .home-content {
-        max-width: 350px;
+        max-width: 100% !important;
         margin: 0 auto;
         padding: 4px 8px 8px 8px;
     }
@@ -194,7 +194,7 @@ st.markdown("""
         border-radius: 16px;
         padding: 20px 32px;
         margin: 0 auto 12px auto;
-        max-width: 900px;
+        max-width: 100% !important;
         box-shadow: 0 15px 30px rgba(102, 126, 234, 0.15);
         position: relative;
         overflow: hidden;
@@ -567,73 +567,129 @@ st.markdown("""
         background: rgba(29, 29, 31, 0.4);
     }
     
-    /* Center the tabs navigation */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        justify-content: center;
-        flex-wrap: wrap;
+    /* iOS-style Navigation Bar */
+    .nav-bar-container {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border-radius: 16px;
-        padding: 12px 16px;
-        margin: 8px 0 16px 0;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        margin: 0 -1rem 0 -1rem;
+        padding: 1rem;
+        box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
     }
     
-    /* Style individual tabs */
-    .stTabs [data-baseweb="tab"] {
-        background: linear-gradient(145deg, #ffffff, #f8f9ff);
-        backdrop-filter: blur(25px);
-        -webkit-backdrop-filter: blur(25px);
-        border-radius: 12px;
-        padding: 8px 16px;
-        margin: 0 4px;
-        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        border: 1.5px solid rgba(102, 126, 234, 0.2);
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
-        min-width: 120px;
-        height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: 0.85rem;
+    /* Apple-style buttons - iOS navigation */
+    .stButton > button {
+        background: rgba(255, 255, 255, 0.7) !important;
+        color: #333 !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        padding: 14px 20px !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        transition: all 0.3s ease !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
+        height: auto !important;
+        min-width: auto !important;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-4px) !important;
+        box-shadow: 0 12px 40px rgba(0, 122, 255, 0.2) !important;
+        background: rgba(255, 255, 255, 0.9) !important;
+    }
+    
+    .stButton > button:active {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(0, 122, 255, 0.3) !important;
+    }
+    
+    /* Fallback for buttons without backdrop-filter support */
+    @supports not (backdrop-filter: blur(10px)) {
+        .stButton > button {
+            background: rgba(255, 255, 255, 0.95) !important;
+        }
+    }
+    
+    /* Navigation columns layout */
+    .nav-columns {
+        gap: 12px;
+    }
+    
+    /* Navigation columns layout */
+    .nav-columns {
+        gap: 12px;
+    }
+    
+    /* App content container */
+    .app-content {
+        min-height: 400px;
+        padding: 2rem 0 1rem 0;
+        margin-top: -1rem;
+    }
+    
+    /* Main content areas */
+    .home-content {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 1rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Individual app containers */
+    .individual-app-container {
+        background: transparent;
+        backdrop-filter: none;
+        border-radius: 0;
+        padding: 0;
+        margin: 0;
+        box-shadow: none;
+        border: none;
+        min-height: auto;
+    }
+    
+    /* Enhanced styling for content */
+    .app-content h1, .app-content h2, .app-content h3 {
         color: #2c3e50;
-        white-space: nowrap;
+        font-weight: 600;
+        margin-bottom: 1rem;
     }
     
-    .stTabs [data-baseweb="tab"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.25);
-        background: linear-gradient(145deg, #ffffff, #f0f4ff);
-        border-color: rgba(102, 126, 234, 0.4);
-        color: #667eea;
+    .app-content p {
+        color: #5a6c7d;
+        line-height: 1.6;
+        margin-bottom: 1rem;
     }
     
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(145deg, #667eea, #764ba2) !important;
-        color: white !important;
-        border-color: rgba(102, 126, 234, 0.8) !important;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
-    }
-    
-    /* Mobile responsive tabs */
+    /* Mobile responsive styles */
     @media (max-width: 768px) {
         .main .block-container {
-            max-width: 380px;
+            max-width: 100%;
             padding: 0.4rem 0.6rem;
         }
         
         .main-content {
-            max-width: 350px;
+            max-width: 100%;
             padding: 4px 6px;
         }
         
         .home-content {
-            max-width: 320px;
-            padding: 4px 6px 8px 6px;
+            max-width: 100%;
+            padding: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        
+        .individual-app-container {
+            padding: 1.5rem;
+            margin: 0.5rem 0;
         }
         
         .hero-section {
@@ -641,34 +697,39 @@ st.markdown("""
             padding: 16px 24px;
         }
         
-        .stTabs [data-baseweb="tab-list"] {
-            padding: 8px 12px;
-            margin: 4px 0 12px 0;
+        .nav-bar-container {
+            padding: 0.75rem;
         }
         
-        .stTabs [data-baseweb="tab"] {
-            min-width: 100px;
-            font-size: 0.8rem;
-            padding: 6px 12px;
-            height: 40px;
+        .stButton > button {
+            font-size: 0.8rem !important;
+            padding: 10px 16px !important;
+            min-width: 100px !important;
+            height: 42px !important;
         }
     }
     
     /* Extra small mobile screens */
     @media (max-width: 480px) {
         .main .block-container {
-            max-width: 320px;
+            max-width: 100%;
             padding: 0.3rem 0.5rem;
         }
         
         .main-content {
-            max-width: 300px;
+            max-width: 100%;
             padding: 2px 4px;
         }
         
         .home-content {
-            max-width: 280px;
-            padding: 2px 4px 6px 4px;
+            max-width: 100%;
+            padding: 1rem;
+        }
+        
+        .individual-app-container {
+            padding: 0;
+            margin: 0;
+            background: transparent;
         }
         
         .hero-section {
@@ -676,11 +737,15 @@ st.markdown("""
             padding: 14px 20px;
         }
         
-        .stTabs [data-baseweb="tab"] {
-            min-width: 80px;
-            font-size: 0.75rem;
-            padding: 4px 8px;
-            height: 36px;
+        .nav-bar-container {
+            padding: 0.5rem;
+        }
+        
+        .stButton > button {
+            font-size: 0.75rem !important;
+            padding: 8px 12px !important;
+            min-width: 85px !important;
+            height: 38px !important;
         }
     }
 </style>
@@ -690,41 +755,48 @@ st.markdown("""
 if 'current_app' not in st.session_state:
     st.session_state.current_app = 'home'
 
-# App configurations
+# App configurations with navigation info
 apps_config = {
     'home': {
         'title': 'Home',
         'description': 'Home',
+        'nav_label': '🏠 Home',
         'file': None
     },
     'classification': {
         'title': 'AutoML Activity Prediction',
         'description': 'AutoML Classification',
+        'nav_label': '🧬 Classification',
         'file': 'app_classification.py'
     },
     'classification_multiple': {
         'title': 'AutoML Multi-Class Prediction',
         'description': 'Multi-Class AutoML',
+        'nav_label': '🎨 Multi-Class',
         'file': 'app_classification_multiple.py'
     },
     'regression': {
         'title': 'AutoML Potency Prediction',
         'description': 'AutoML Regression',
+        'nav_label': '💊 Regression',
         'file': 'app_regression.py'
     },
     'graph_classification': {
         'title': 'Graph Convolution Activity Prediction',
         'description': 'Graph Classification',
+        'nav_label': '🔗 Graph Class',
         'file': 'app_graph_classification.py'
     },
     'graph_multiclass': {
         'title': 'Graph Multi-Class Prediction',
         'description': 'Graph Multi-Class',
+        'nav_label': '🔥 Graph Multi',
         'file': 'app_graph_multiclass.py'
     },
     'graph_regression': {
         'title': 'Graph Convolution Potency Prediction',
         'description': 'Graph Regression',
+        'nav_label': '⚗️ Graph Reg',
         'file': 'app_graph_regression.py'
     }
 }
@@ -740,8 +812,64 @@ def load_app_module(app_file):
         st.error(f"Error loading app: {e}")
         return None
 
+def render_navigation_bar():
+    """Render iOS-style horizontal navigation bar"""
+    
+    # Add custom CSS for active state
+    st.markdown("""
+    <style>
+        /* Active navigation button */
+        div[data-testid="column"] button[kind="primary"] {
+            background: linear-gradient(135deg, #007AFF, #5856D6) !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 25px rgba(0, 122, 255, 0.4) !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }
+        
+        div[data-testid="column"] button[kind="primary"]:hover {
+            transform: translateY(-4px) !important;
+            box-shadow: 0 12px 35px rgba(0, 122, 255, 0.5) !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 12px;
+        margin: 10px 0 10px 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    ">
+    """, unsafe_allow_html=True)
+    
+    # Create navigation items
+    cols = st.columns(len(apps_config))
+    
+    for i, (app_key, app_info) in enumerate(apps_config.items()):
+        with cols[i]:
+            # Check if this is the current app
+            is_active = st.session_state.current_app == app_key
+            
+            # Create button with appropriate styling
+            if st.button(
+                app_info['nav_label'], 
+                key=f"nav_{app_key}",
+                help=app_info['title'],
+                use_container_width=True,
+                type="primary" if is_active else "secondary"
+            ):
+                st.session_state.current_app = app_key
+                st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
 def render_main_interface():
-    """Render the main interface with tabbed navigation"""
+    """Render the main interface with navigation and content"""
     
     # Header
     st.markdown("""
@@ -768,66 +896,63 @@ def render_main_interface():
     </div>
     """, unsafe_allow_html=True)
     
-    # Create tabs
-    tab_labels = [app_info['description'] for app_info in apps_config.values()]
-    tabs = st.tabs(tab_labels)
+    # Navigation bar
+    render_navigation_bar()
     
-    # Home tab
-    with tabs[0]:
+    # Content area with better spacing
+    current_app = st.session_state.current_app
+    
+    if current_app == 'home':
         render_home_content()
-    
-    # Classification tab
-    with tabs[1]:
-        run_individual_app('classification')
-    
-    # Multi-Class AutoML tab
-    with tabs[2]:
-        run_individual_app('classification_multiple')
-    
-    # Regression tab  
-    with tabs[3]:
-        run_individual_app('regression')
-    
-    # Graph Classification tab
-    with tabs[4]:
-        run_individual_app('graph_classification')
-    
-    # Graph Multi-Class tab
-    with tabs[5]:
-        run_individual_app('graph_multiclass')
-    
-    # Graph Regression tab
-    with tabs[6]:
-        run_individual_app('graph_regression')
+    else:
+        # Wrap individual apps in a styled container
+        st.markdown('<div class="individual-app-container">', unsafe_allow_html=True)
+        run_individual_app(current_app)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def render_home_content():
     """Render the home page content"""
-    # Home content area with compact spacing
+    # Home content area with beautiful styling
     st.markdown('<div class="home-content">', unsafe_allow_html=True)
     
     # Welcome content
     st.markdown("""
     ### 🎯 Welcome to Chemlara Suite
     
-    Select an application from the navigation tabs above to get started:
+    Advanced machine learning applications for chemical research and drug discovery. 
+    Use the navigation bar above to access different prediction models:
     
-    - **🧬 AutoML Activity Prediction**: Binary classification models for molecular activity
-    - **🎨 AutoML Multi-Class Prediction**: Multi-class classification for complex activity categories
-    - **💊 AutoML Potency Prediction**: Regression models for potency estimation  
-    - **🔗 Graph Activity Prediction**: Graph neural networks for binary activity classification
-    - **🔥 Graph Multi-Class Prediction**: Graph neural networks for multi-class activity prediction
-    - **⚗️ Graph Potency Prediction**: Graph neural networks for potency regression
+    **🧬 Classification Models:**
+    - **AutoML Classification**: Binary activity prediction using automated machine learning
+    - **Multi-Class Classification**: Categorize compounds into multiple activity classes
     
-    All models are powered by advanced machine learning algorithms including TPOT AutoML and DeepChem.
+    **💊 Regression Models:**
+    - **AutoML Regression**: Predict potency values and continuous properties
+    
+    **🔗 Graph Neural Networks:**
+    - **Graph Classification**: Molecular activity prediction using graph convolution
+    - **Graph Multi-Class**: Multi-category prediction with graph neural networks  
+    - **Graph Regression**: Potency prediction using molecular graph structures
+    
+    ---
+    
+    **🚀 Features:**
+    - Upload CSV files with SMILES and activity data
+    - Automated model training and optimization
+    - Real-time predictions on new compounds
+    - Batch processing capabilities
+    - Model performance metrics and validation
+    
+    All models are powered by advanced algorithms including **TPOT AutoML**, **DeepChem**, and **RDKit**.
     """)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Footer with reduced spacing
     st.markdown("""
-    <div class="footer" style="margin-top: 8px;">
-        <p>Built with Streamlit • Powered by RDKit, DeepChem & TPOT</p>
-        <p>© 2025 Chemlara Suite - Advanced Chemical Machine Learning</p>
+    <div class="footer" style="margin-top: 1rem; text-align: center; padding: 1rem; background: rgba(255, 255, 255, 0.5); border-radius: 15px;">
+        <p style="margin: 0; color: #667eea; font-weight: 500;">Built with Streamlit • Powered by RDKit, DeepChem & TPOT</p>
+        <p style="margin: 0; color: #8e9aaf; font-size: 0.9rem;">© 2025 Chemlara Suite - Advanced Chemical Machine Learning</p>
     </div>
     """, unsafe_allow_html=True)
 

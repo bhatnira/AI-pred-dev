@@ -114,27 +114,43 @@ st.markdown("""
     
     /* Apple-style buttons */
     .stButton > button {
-        background: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%);
-        color: white;
-        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.7);
+        color: #333;
+        border-radius: 16px;
         border: none;
-        padding: 14px 20px;
+        padding: 16px 24px;
         font-weight: 600;
         font-size: 16px;
-        transition: all 0.2s ease;
+        transition: all 0.3s ease;
         width: 100%;
-        box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
-        background: linear-gradient(135deg, #FF5252 0%, #26A69A 100%);
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0, 122, 255, 0.2);
+        background: rgba(255, 255, 255, 0.9);
     }
     
     .stButton > button:active {
-        transform: translateY(0px);
-        box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 122, 255, 0.3);
+    }
+    
+    /* Navigation buttons specific styling */
+    .stButton[data-testid*="nav_"] > button {
+        background: rgba(255, 255, 255, 0.7);
+        color: #333;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 16px;
+        font-weight: 600;
+        padding: 14px 20px;
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     /* iOS Input fields */
@@ -978,6 +994,61 @@ def vis_contribs(mol, contributions):
         except:
             return None
 
+# Create horizontal navigation bar like main page
+def render_navigation_bar():
+    nav_options = {
+        "🏠 Home": "home",
+        "🔬 Build Model": "build", 
+        "⚗️ Predict SMILES": "predict",
+        "📊 Batch Predict": "batch"
+    }
+    
+    # Initialize session state
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = "home"
+    
+    st.markdown("""
+    <div style="
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 12px;
+        margin: 10px 0 10px 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    ">
+    """, unsafe_allow_html=True)
+    
+    cols = st.columns(len(nav_options))
+    
+    for idx, (label, key) in enumerate(nav_options.items()):
+        with cols[idx]:
+            is_active = st.session_state.active_tab == key
+            button_style = """
+                background: linear-gradient(135deg, #007AFF, #5856D6);
+                color: white;
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(0, 122, 255, 0.4);
+            """ if is_active else """
+                background: rgba(255, 255, 255, 0.7);
+                color: #333;
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            """
+            
+            if st.button(
+                label,
+                key=f"graph_class_nav_{key}",
+                help=f"Switch to {label}",
+                use_container_width=True
+            ):
+                if st.session_state.active_tab != key:
+                    st.session_state.active_tab = key
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    return st.session_state.active_tab
+
 # Main function to run the Streamlit app
 def main():
     # Create iOS-style header
@@ -991,10 +1062,10 @@ def main():
     if 'loaded_model' not in st.session_state:
         st.session_state.loaded_model = None
 
-    # Create tabs for mobile-friendly navigation
-    tab1, tab2, tab3, tab4 = st.tabs(["🏠 Home", "🔬 Build Model", "⚗️ Predict SMILES", "📊 Batch Predict"])
+    # Render navigation and get active tab
+    active_tab = render_navigation_bar()
 
-    with tab1:
+    if active_tab == "home":
         st.markdown("## 🎯 Welcome to GraphConv Classifier")
         st.markdown("Leverage the power of Graph Convolutional Networks for molecular activity classification with interpretable results.")
         
@@ -1009,7 +1080,7 @@ def main():
         - **Mobile-Optimized** - Works seamlessly on all devices
         """)
         
-        st.success("🚀 Get Started: Use the tabs above to build your model and make predictions!")
+        st.success("🚀 Get Started: Use the navigation above to build your model and make predictions!")
         
         # Quick stats
         col1, col2, col3 = st.columns(3)
@@ -1020,7 +1091,7 @@ def main():
         with col3:
             st.metric("Interpretability", "Yes", "Contribution maps available")
 
-    with tab2:
+    elif active_tab == "build":
         st.markdown("## 🔬 Build GraphConv Classifier")
         st.markdown("Upload your dataset to train a Graph Convolutional Network for molecular activity classification.")
         
@@ -1168,7 +1239,7 @@ def main():
             except Exception as e:
                 st.error(f"❌ Error reading file: {str(e)}")
 
-    with tab3:
+    elif active_tab == "predict":
         st.markdown("## ⚗️ Single Molecule Prediction")
         st.markdown("Enter a SMILES string to predict molecular activity and visualize atomic contributions.")
 
@@ -1436,7 +1507,7 @@ def main():
                         except Exception as e:
                             st.error(f"❌ Error: {str(e)}")
 
-    with tab4:
+    elif active_tab == "batch":
         st.markdown("## 📊 Batch Prediction")
         st.markdown("Upload an Excel file with multiple SMILES to predict activities and generate contribution maps.")
         
