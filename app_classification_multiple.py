@@ -955,13 +955,6 @@ def create_prediction_report_zip(predictions_df, smiles_col='SMILES',
         predictions_df.to_csv(csv_buffer, index=False)
         zip_file.writestr(f"multiclass_predictions_{timestamp}.csv", csv_buffer.getvalue())
         
-        # 2. Save predictions as Excel with formatting
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            predictions_df.to_excel(writer, index=False, sheet_name='Predictions')
-        excel_buffer.seek(0)
-        zip_file.writestr(f"multiclass_predictions_{timestamp}.xlsx", excel_buffer.getvalue())
-        
         # 3. Create summary statistics
         summary_stats = f"""
 ========================================
@@ -995,7 +988,7 @@ Total Molecules: {len(predictions_df)}
                 pass
         
         # Add class-specific probabilities summary if available
-        if class_names:
+        if class_names is not None and len(class_names) > 0:
             summary_stats += f"\nCLASS PROBABILITY COLUMNS\n------------------------\n"
             for class_name in class_names:
                 prob_col = f'Prob_{class_name}'
@@ -1004,12 +997,29 @@ Total Molecules: {len(predictions_df)}
         
         zip_file.writestr(f"multiclass_prediction_summary_{timestamp}.txt", summary_stats)
         
-        # 4. Save individual molecular structures if provided
+        # 4. Save individual molecular fragment contribution maps if provided
         if individual_structures:
-            structures_folder = "molecular_structures/"
-            for idx, (smiles, img_bytes) in enumerate(individual_structures):
-                if img_bytes:
-                    zip_file.writestr(f"{structures_folder}molecule_{idx+1}.png", img_bytes)
+            structures_folder = "individual_predictions/"
+            for idx, structure_data in enumerate(individual_structures):
+                if isinstance(structure_data, dict):
+                    # Save fragment contribution map
+                    if 'fragment_map' in structure_data and structure_data['fragment_map']:
+                        img_buffer = io.BytesIO()
+                        structure_data['fragment_map'].save(img_buffer, format='PNG', dpi=(300, 300))
+                        img_buffer.seek(0)
+                        zip_file.writestr(f"{structures_folder}molecule_{idx+1}_fragment_map.png", img_buffer.getvalue())
+                    
+                    # Save molecular structure
+                    if 'structure' in structure_data and structure_data['structure']:
+                        img_buffer = io.BytesIO()
+                        structure_data['structure'].save(img_buffer, format='PNG')
+                        img_buffer.seek(0)
+                        zip_file.writestr(f"{structures_folder}molecule_{idx+1}_structure.png", img_buffer.getvalue())
+                elif isinstance(structure_data, tuple) and len(structure_data) == 2:
+                    # Legacy format: (smiles, img_bytes)
+                    smiles, img_bytes = structure_data
+                    if img_bytes:
+                        zip_file.writestr(f"{structures_folder}molecule_{idx+1}.png", img_bytes)
         
         # 5. Create README
         readme_content = f"""
@@ -1019,10 +1029,9 @@ This folder contains all outputs from your batch multi-class prediction session.
 
 ## Files Included:
 
-1. **multiclass_predictions_{timestamp}.csv** - Predictions in CSV format
-2. **multiclass_predictions_{timestamp}.xlsx** - Predictions in Excel format with formatting
-3. **multiclass_prediction_summary_{timestamp}.txt** - Statistical summary of predictions
-4. **molecular_structures/** - Individual molecular structure images (if available)
+1. **multiclass_predictions_{timestamp}.csv** - Complete predictions in CSV format
+2. **multiclass_prediction_summary_{timestamp}.txt** - Statistical summary of predictions
+3. **individual_predictions/** - Fragment contribution maps and structures for each molecule
 
 ## Column Descriptions:
 
@@ -1031,11 +1040,17 @@ This folder contains all outputs from your batch multi-class prediction session.
 - **{confidence_col}**: Model confidence in prediction
 - **Prob_[ClassName]**: Probability for each specific class
 
+## Individual Predictions Folder:
+
+For each molecule, you'll find:
+- **molecule_N_fragment_map.png**: High-resolution fragment contribution map (for Circular Fingerprint)
+- **molecule_N_structure.png**: Molecular structure visualization
+
 ## How to Use:
 
-- Open the CSV/Excel file in your preferred spreadsheet software
+- Open the CSV file in your preferred spreadsheet software
 - Review the summary for overall statistics and class distribution
-- View individual molecular structures in the structures folder
+- View individual fragment maps to understand which molecular fragments contribute to predictions
 - Use class probabilities to understand model confidence across all classes
 
 Generated by Chemlara Predictor - Multi-Class Classification
@@ -1052,45 +1067,20 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
     """
     start_time = time.time()
     
-    # Enhanced progress tracking with time estimates
+    # Simple progress tracking without time estimates
     progress_container = st.container()
     
     with progress_container:
-        # Time tracking metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            elapsed_placeholder = st.empty()
-        with col2:
-            remaining_placeholder = st.empty()
-        with col3:
-            estimated_placeholder = st.empty()
-        
         progress_bar = st.progress(0)
         status_text = st.empty()
     
-    # Estimate total time based on dataset size
-    n_samples = len(df)
-    estimated_total_time = max(30, min(300, n_samples * 0.5 + generations * cv * 20))  # Longer for multi-class
-    
-    def update_progress_with_time(progress_percent, status_msg):
-        elapsed = time.time() - start_time
-        
-        if progress_percent > 0.05:  # After some progress
-            estimated_remaining = (elapsed / progress_percent) * (1 - progress_percent)
-        else:
-            estimated_remaining = estimated_total_time
-        
-        # Update time displays
-        elapsed_placeholder.markdown(create_ios_metric_card("Elapsed", format_time_duration(elapsed), "", "⏱️"), unsafe_allow_html=True)
-        remaining_placeholder.markdown(create_ios_metric_card("Remaining", format_time_duration(max(0, estimated_remaining)), "", "⏳"), unsafe_allow_html=True)
-        estimated_placeholder.markdown(create_ios_metric_card("Total Est.", format_time_duration(estimated_total_time), "", "📊"), unsafe_allow_html=True)
-        
+    def update_progress(progress_percent, status_msg):
         progress_bar.progress(progress_percent)
         status_text.info(f"🔬 {status_msg}")
     
     try:
         # Phase 1: Data Preparation
-        update_progress_with_time(0.05, "Standardizing SMILES...")
+        update_progress(0.05, "Standardizing SMILES...")
         
         df[smiles_col + '_standardized'] = df[smiles_col].apply(standardize_smiles)
         df.dropna(subset=[smiles_col + '_standardized'], inplace=True)
@@ -1101,7 +1091,7 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
             st.error("Multi-class classification requires at least 3 distinct classes. Please check your dataset.")
             return None, None, None, None, None, None, None, None, None, None, None, None
 
-        update_progress_with_time(0.15, "Featurizing molecules...")
+        update_progress(0.15, "Featurizing molecules...")
         
         # Featurize molecules with progress updates
         # For Circular Fingerprint, use custom radius and size
@@ -1127,13 +1117,13 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
             
             # Update progress for featurization (15% to 45%)
             progress = 0.15 + (i / len(smiles_list)) * 0.3
-            update_progress_with_time(min(progress, 0.45), f"Featurizing molecules... {i+batch_size}/{len(smiles_list)}")
+            update_progress(min(progress, 0.45), f"Featurizing molecules... {i+batch_size}/{len(smiles_list)}")
 
         if not features:
             st.error("No valid molecules found for featurization. Please ensure your SMILES data is correct.")
             return None, None, None, None, None, None, None, None, None, None, None, None
 
-        update_progress_with_time(0.5, "Preparing training data...")
+        update_progress(0.5, "Preparing training data...")
         
         feature_df = pd.DataFrame(features)
         X = feature_df
@@ -1150,7 +1140,7 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
 
         X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=test_size, random_state=42, stratify=y_encoded)
 
-        update_progress_with_time(0.6, "Initializing TPOT classifier...")
+        update_progress(0.6, "Initializing TPOT classifier...")
         
         # Use optimized TPOT configuration
         tpot = TPOTClassifier(
@@ -1165,12 +1155,12 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
             max_eval_time_mins=0.5
         )
 
-        update_progress_with_time(0.65, "Training TPOT model...")
+        update_progress(0.65, "Training TPOT model...")
         
         # Train the TPOT model
         tpot.fit(X_train, y_train)
 
-        update_progress_with_time(0.9, "Evaluating model performance...")
+        update_progress(0.9, "Evaluating model performance...")
         
         # Make predictions
         y_pred = tpot.predict(X_test)
@@ -1188,18 +1178,20 @@ def preprocess_and_model_multiclass(df, smiles_col, activity_col, featurizer_nam
         except:
             roc_auc = None
 
-        update_progress_with_time(1.0, "Training completed successfully!")
+        update_progress(1.0, "Training completed successfully!")
         
-        # Clear progress indicators after a brief pause
-        time.sleep(1)
+        # Calculate total elapsed time
+        elapsed_time = time.time() - start_time
+        
+        # Clear progress indicators
         progress_container.empty()
 
-        return tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, y_pred_proba, class_names, le, df, X_train, y_train, featurizer
+        return tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, y_pred_proba, class_names, le, df, X_train, y_train, featurizer, elapsed_time
         
     except Exception as e:
         progress_container.empty()
         st.error(f"An error occurred during model training: {str(e)}")
-        return None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_encoder, class_names=None, X_train=None, featurizer_obj=None):
     """
@@ -1232,7 +1224,7 @@ def predict_from_single_smiles_multiclass(smiles, featurizer_name, model, label_
         
         # Decode prediction
         prediction = label_encoder.inverse_transform([prediction_encoded])[0]
-        max_probability = max(probabilities)
+        max_probability = float(np.max(probabilities))
         
         # Use class_names if provided, otherwise use label_encoder.classes_
         display_classes = class_names if class_names is not None else label_encoder.classes_
@@ -1495,16 +1487,13 @@ def main():
                     cfp_size_val = 2048
                 
                 with st.spinner("🔄 Building your multi-class model... This may take several minutes."):
-                    st.markdown(create_ios_card("Multi-Class Training in Progress", 
-                                              "Processing data and training your machine learning model for multi-class classification...", "🤖"), unsafe_allow_html=True)
-                    
                     results = preprocess_and_model_multiclass(
                         df, smiles_col, activity_col, st.session_state.selected_featurizer_name_multiclass, 
                         generations=generations, cv=cv, verbosity=verbosity, test_size=test_size,
                         cfp_radius=cfp_radius_val, cfp_size=cfp_size_val)
 
                     if results[0] is not None:
-                        tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, y_pred_proba, class_names, le, df_result, X_train, y_train, featurizer = results
+                        tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, y_pred_proba, class_names, le, df_result, X_train, y_train, featurizer, elapsed_time = results
                         
                         # Save model and necessary data
                         with open('best_multiclass_model.pkl', 'wb') as f:
@@ -1518,6 +1507,9 @@ def main():
                         with open('featurizer_multiclass.pkl', 'wb') as f:
                             joblib.dump(featurizer, f)
 
+                        # Display elapsed time
+                        st.markdown(f"### ⏱️ Training Time: {format_time_duration(elapsed_time)}")
+                        
                         # Display model metrics in cards
                         st.markdown("### 📈 Model Performance")
                         
@@ -1564,42 +1556,6 @@ def main():
                             except Exception as e:
                                 st.error(f"CM Error: {str(e)}")
                                 st.info("ℹ️ Confusion matrix not available for this classification problem.")
-
-                        # Download Full Model Report as ZIP
-                        st.markdown("### 📦 Download Complete Model Report")
-                        st.markdown(create_ios_card("Complete Training Report", 
-                                                  "Download a comprehensive ZIP package containing all metrics, visualizations, and reports from your model training.", "📊"), 
-                                  unsafe_allow_html=True)
-                        
-                        try:
-                            # Create model parameters dict
-                            model_params = {
-                                'Generations': generations,
-                                'CV Folds': cv,
-                                'Test Size': test_size,
-                                'Featurizer': st.session_state.selected_featurizer_name_multiclass,
-                                'Number of Classes': len(class_names)
-                            }
-                            
-                            zip_buffer = create_model_report_zip(
-                                accuracy, precision, recall, f1, roc_auc,
-                                confusion_matrix_fig=cm_fig,
-                                roc_curve_fig=roc_fig,
-                                model_params=model_params,
-                                class_names=class_names
-                            )
-                            
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            st.download_button(
-                                label="📥 Download Complete Model Report (ZIP)",
-                                data=zip_buffer.getvalue(),
-                                file_name=f"multiclass_model_report_{timestamp}.zip",
-                                mime="application/zip",
-                                use_container_width=True,
-                                help="Download a ZIP file containing all model outputs, metrics, visualizations, and reports"
-                            )
-                        except Exception as e:
-                            st.warning(f"Could not create ZIP report: {str(e)}")
 
                         # Display best pipeline in a nice container
                         st.markdown("### 🏆 Best TPOT Pipeline")
@@ -1654,19 +1610,119 @@ def main():
                             except Exception as lime_error:
                                 pass  # Silent error handling
 
-                            # Create download buttons
-                            col1, col2, col3, col4, col5 = st.columns(5)
-                            with col1:
-                                st.markdown(create_downloadable_model_link(model_filename, '📥 Model'), unsafe_allow_html=True)
-                            with col2:
-                                st.markdown(create_downloadable_model_link(label_encoder_filename, '📥 Encoder'), unsafe_allow_html=True)
-                            with col3:
-                                st.markdown(create_downloadable_model_link(class_names_filename, '📥 Classes'), unsafe_allow_html=True)
-                            with col4:
-                                st.markdown(create_downloadable_model_link(X_train_filename, '📥 Training Data'), unsafe_allow_html=True)
-                            with col5:
-                                if os.path.exists(lime_sample_filename):
-                                    st.markdown(create_downloadable_model_link(lime_sample_filename, '📥 LIME Sample'), unsafe_allow_html=True)
+                            # Create comprehensive model configuration details
+                            model_config = {
+                                'smiles_column': smiles_col,
+                                'activity_column': activity_col,
+                                'featurizer': st.session_state.selected_featurizer_name_multiclass,
+                                'generations': generations,
+                                'cv_folds': cv,
+                                'verbosity': verbosity,
+                                'test_size': test_size,
+                                'total_samples': len(df),
+                                'training_samples': len(X_train),
+                                'test_samples': len(X_test),
+                                'num_classes': len(class_names),
+                                'class_names': list(class_names),
+                            }
+                            
+                            # Add CFP-specific parameters if applicable
+                            if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                                model_config['cfp_radius'] = st.session_state.get('cfp_radius_multiclass', 4)
+                                model_config['cfp_size'] = st.session_state.get('cfp_size_multiclass', 2048)
+                            
+                            # Create comprehensive model package ZIP
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            try:
+                                # Prepare model parameters for the report
+                                model_params = {
+                                    'TPOT Generations': generations,
+                                    'Cross-Validation Folds': cv,
+                                    'Test Size': f"{test_size:.2%}",
+                                    'Featurizer': st.session_state.selected_featurizer_name_multiclass,
+                                    'Total Samples': len(df),
+                                    'Training Samples': len(X_train),
+                                    'Test Samples': len(X_test),
+                                    'Number of Classes': len(class_names)
+                                }
+                                
+                                if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                                    model_params['CFP Radius'] = st.session_state.get('cfp_radius_multiclass', 4)
+                                    model_params['CFP Size'] = st.session_state.get('cfp_size_multiclass', 2048)
+                                
+                                # Create comprehensive model report ZIP
+                                model_package_zip = create_model_report_zip(
+                                    accuracy=accuracy,
+                                    precision=precision,
+                                    recall=recall,
+                                    f1=f1,
+                                    roc_auc=roc_auc,
+                                    confusion_matrix_fig=cm_fig,
+                                    roc_curve_fig=roc_fig,
+                                    model_params=model_params,
+                                    class_names=class_names
+                                )
+                                
+                                # Add model files to the ZIP
+                                zip_buffer = io.BytesIO(model_package_zip.getvalue())
+                                
+                                with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
+                                    # Add model files
+                                    with open(model_filename, 'rb') as f:
+                                        zip_file.writestr(f"model_files/{model_filename}", f.read())
+                                    with open(label_encoder_filename, 'rb') as f:
+                                        zip_file.writestr(f"model_files/{label_encoder_filename}", f.read())
+                                    with open(class_names_filename, 'rb') as f:
+                                        zip_file.writestr(f"model_files/{class_names_filename}", f.read())
+                                    with open(X_train_filename, 'rb') as f:
+                                        zip_file.writestr(f"model_files/{X_train_filename}", f.read())
+                                    
+                                    # Add LIME sample if available
+                                    if os.path.exists(lime_sample_filename):
+                                        with open(lime_sample_filename, 'r', encoding='utf-8') as f:
+                                            zip_file.writestr(f"model_files/{lime_sample_filename}", f.read())
+                                    
+                                    # Add model configuration JSON
+                                    import json
+                                    config_json = json.dumps(model_config, indent=2, default=str)
+                                    zip_file.writestr(f"model_configuration_{timestamp}.json", config_json)
+                                    
+                                    # Add pipeline details
+                                    try:
+                                        pipeline_details = str(tpot.fitted_pipeline_)
+                                        zip_file.writestr(f"best_pipeline_{timestamp}.txt", pipeline_details)
+                                    except:
+                                        pass
+                                
+                                zip_buffer.seek(0)
+                                
+                                # Display comprehensive download button
+                                st.download_button(
+                                    label="📦 Download Complete Model Package (ZIP)",
+                                    data=zip_buffer,
+                                    file_name=f'multiclass_model_package_{timestamp}.zip',
+                                    mime='application/zip',
+                                    use_container_width=True,
+                                    help="Complete package with model files, configuration, performance metrics, and visualizations"
+                                )
+                                
+                            except Exception as zip_error:
+                                st.error(f"Error creating model package ZIP: {str(zip_error)}")
+                            
+                            # Individual file downloads (optional)
+                            with st.expander("📂 Download Individual Model Files"):
+                                col1, col2, col3, col4, col5 = st.columns(5)
+                                with col1:
+                                    st.markdown(create_downloadable_model_link(model_filename, '📥 Model'), unsafe_allow_html=True)
+                                with col2:
+                                    st.markdown(create_downloadable_model_link(label_encoder_filename, '📥 Encoder'), unsafe_allow_html=True)
+                                with col3:
+                                    st.markdown(create_downloadable_model_link(class_names_filename, '📥 Classes'), unsafe_allow_html=True)
+                                with col4:
+                                    st.markdown(create_downloadable_model_link(X_train_filename, '📥 Training Data'), unsafe_allow_html=True)
+                                with col5:
+                                    if os.path.exists(lime_sample_filename):
+                                        st.markdown(create_downloadable_model_link(lime_sample_filename, '📥 LIME Sample'), unsafe_allow_html=True)
                         except Exception as e:
                             st.warning(f"Could not save model files: {str(e)}")
 
@@ -1713,7 +1769,7 @@ def main():
                     smile_input, st.session_state.selected_featurizer_name_multiclass, tpot_model, label_encoder, class_names, X_train, featurizer_loaded)
                 
                 if prediction is not None:
-                    # Three-column layout: fragment map, prediction results, and color legend
+                    # Three-column layout for results
                     col1, col2, col3 = st.columns([2, 1, 1])
                     
                     with col1:
@@ -1872,11 +1928,19 @@ def main():
                     with open('best_multiclass_model.pkl', 'rb') as f_model, \
                          open('label_encoder_multiclass.pkl', 'rb') as f_le, \
                          open('class_names_multiclass.pkl', 'rb') as f_classes, \
-                         open('X_train_multiclass.pkl', 'rb') as f_X_train:
+                         open('X_train_multiclass.pkl', 'rb') as f_X_train, \
+                         open('featurizer_multiclass.pkl', 'rb') as f_feat:
                         tpot_model = joblib.load(f_model)
                         label_encoder = joblib.load(f_le)
                         class_names = joblib.load(f_classes)
                         X_train = joblib.load(f_X_train)
+                        featurizer_obj = joblib.load(f_feat)
+                        
+                        # Store in session state for visualization
+                        st.session_state['_tpot_model_multiclass'] = tpot_model
+                        st.session_state['_X_train_multiclass'] = X_train
+                        st.session_state['_featurizer_obj_multiclass'] = featurizer_obj
+                        
                 except FileNotFoundError:
                     st.error("❌ No trained multi-class model found. Please build a model first in the 'Build Model' tab.")
                     return
@@ -1885,11 +1949,9 @@ def main():
                     predictions = []
                     probabilities = []
                     all_class_probabilities = []
+                    individual_images = []  # Store fragment maps and structures for ZIP
                     
                     # iOS-style progress tracking
-                    st.markdown(create_ios_card("Processing Molecules", 
-                                              "Analyzing your molecules using the trained multi-class model...", "⚗️"), unsafe_allow_html=True)
-                    
                     progress_container = st.container()
                     with progress_container:
                         progress_bar = st.progress(0)
@@ -1908,8 +1970,8 @@ def main():
                             if standardized_smiles:
                                 mol = Chem.MolFromSmiles(standardized_smiles)
                                 if mol is not None:
-                                    featurizer = Featurizer[st.session_state.selected_featurizer_name_multiclass]
-                                    features = featurizer.featurize([mol])[0]
+                                    # Use the loaded featurizer object from session state
+                                    features = featurizer_obj.featurize([mol])[0]
                                     feature_df = pd.DataFrame([features])
                                     new_column_names = [f"fp_{col}" for col in feature_df.columns]
                                     feature_df.columns = new_column_names
@@ -1919,27 +1981,54 @@ def main():
                                     prediction_proba = tpot_model.predict_proba(feature_df)[0]
                                     
                                     prediction = label_encoder.inverse_transform([prediction_encoded])[0]
-                                    max_probability = max(prediction_proba)
+                                    max_probability = float(np.max(prediction_proba))
                                     
                                     predictions.append(prediction)
                                     probabilities.append(max_probability)
-                                    all_class_probabilities.append(prediction_proba)
+                                    all_class_probabilities.append(list(prediction_proba))
+                                    
+                                    # Generate fragment map and structure for ZIP export
+                                    image_data = {}
+                                    
+                                    # Generate fragment contribution map for Circular Fingerprint
+                                    if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                                        try:
+                                            pred_class_idx = np.where(class_names == prediction)[0][0] if isinstance(class_names, np.ndarray) else list(class_names).index(prediction)
+                                            fragment_map = generate_fragment_contribution_map(
+                                                standardized_smiles, tpot_model, X_train, featurizer_obj,
+                                                class_names, target_class_idx=pred_class_idx, cfp_number=None
+                                            )
+                                            if fragment_map:
+                                                image_data['fragment_map'] = fragment_map
+                                        except Exception:
+                                            pass
+                                    
+                                    # Generate molecular structure
+                                    try:
+                                        structure_img = Draw.MolToImage(mol, size=(400, 400))
+                                        image_data['structure'] = structure_img
+                                    except Exception:
+                                        pass
+                                    
+                                    individual_images.append(image_data)
                                 else:
                                     predictions.append("Invalid SMILES")
                                     probabilities.append(0.0)
                                     all_class_probabilities.append([0.0] * len(class_names))
+                                    individual_images.append({})
                             else:
                                 predictions.append("Invalid SMILES")
                                 probabilities.append(0.0)
                                 all_class_probabilities.append([0.0] * len(class_names))
+                                individual_images.append({})
                         except Exception as e:
                             predictions.append(f"Error: {str(e)}")
                             probabilities.append(0.0)
                             all_class_probabilities.append([0.0] * len(class_names))
+                            individual_images.append({})
 
                     # Clear progress indicators
                     progress_container.empty()
-                    st.success("🎉 Batch multi-class prediction completed successfully!")
                     
                     # Add results to dataframe
                     df['Predicted_Class'] = predictions
@@ -1949,67 +2038,216 @@ def main():
                     for i, class_name in enumerate(class_names):
                         df[f'Prob_{class_name}'] = [f"{probs[i]:.1%}" if len(probs) > i else "N/A" for probs in all_class_probabilities]
 
+                    # Display individual results first in iOS cards
+                    st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">🧪 Individual Prediction Results</h3>', unsafe_allow_html=True)
+                    
+                    # Show results in expandable sections for better organization
+                    results_per_page = 5  # Show 5 results at a time
+                    total_valid_molecules = sum(1 for p in predictions if not str(p).startswith("Error") and p != "Invalid SMILES")
+                    
+                    if total_valid_molecules > 0:
+                        # Create pagination for large datasets
+                        num_pages = (total_valid_molecules + results_per_page - 1) // results_per_page
+                        
+                        if num_pages > 1:
+                            page = st.selectbox("📄 Select Results Page", 
+                                              options=list(range(1, num_pages + 1)), 
+                                              format_func=lambda x: f"Page {x} ({min(results_per_page, total_valid_molecules - (x-1)*results_per_page)} results)",
+                                              key='batch_page_selector')
+                        else:
+                            page = 1
+                        
+                        # Calculate indices for current page
+                        valid_indices = [i for i, p in enumerate(predictions) if not str(p).startswith("Error") and p != "Invalid SMILES"]
+                        start_idx = (page - 1) * results_per_page
+                        end_idx = min(start_idx + results_per_page, len(valid_indices))
+                        current_page_indices = valid_indices[start_idx:end_idx]
+                        
+                        # Display individual results for current page
+                        for idx in current_page_indices:
+                            row = df.iloc[idx]
+                            prediction = predictions[idx]
+                            probability = probabilities[idx]
+                            smiles = row[smiles_col_predict]
+                            
+                            with st.expander(f"🧬 Molecule {idx + 1}: {prediction} ({probability:.1%} confidence)", expanded=False):
+                                # Use EXACT same format as single SMILES prediction
+                                col1, col2, col3 = st.columns([2, 1, 1])
+                                
+                                with col1:
+                                    # Display atomic contribution map for Circular Fingerprint (SAME AS SINGLE PREDICTION)
+                                    if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                                        try:
+                                            # Get the featurizer object from session state
+                                            featurizer_obj = st.session_state.get('_featurizer_obj_multiclass')
+                                            model = st.session_state.get('_tpot_model_multiclass')
+                                            X_train_data = st.session_state.get('_X_train_multiclass')
+                                            
+                                            if featurizer_obj is not None and model is not None and X_train_data is not None:
+                                                # Get predicted class index
+                                                pred_class_idx = np.where(class_names == prediction)[0][0] if isinstance(class_names, np.ndarray) else list(class_names).index(prediction)
+                                                
+                                                atomic_contrib_img = generate_fragment_contribution_map(
+                                                    smiles, model, X_train_data, featurizer_obj, 
+                                                    class_names, target_class_idx=pred_class_idx, cfp_number=None
+                                                )
+                                                
+                                                if atomic_contrib_img:
+                                                    st.markdown("""
+                                                    <div class="ios-card" style="padding: 16px; text-align: center;">
+                                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🗺️ Fragment Contribution Map</h4>
+                                                    </div>
+                                                    """, unsafe_allow_html=True)
+                                                    
+                                                    # Display larger, high-resolution image
+                                                    st.image(atomic_contrib_img, width=500)
+                                                    
+                                                    # Download button for the high-resolution image
+                                                    create_download_button_for_image(
+                                                        atomic_contrib_img, 
+                                                        f"fragment_contribution_molecule_{idx + 1}.png",
+                                                        "📥 Download HD Image"
+                                                    )
+                                                else:
+                                                    # Fallback to molecular structure
+                                                    mol = Chem.MolFromSmiles(smiles)
+                                                    if mol:
+                                                        img = Draw.MolToImage(mol, size=(400, 400))
+                                                        st.markdown("""
+                                                        <div class="ios-card" style="padding: 16px; text-align: center;">
+                                                            <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                                        </div>
+                                                        """, unsafe_allow_html=True)
+                                                        st.image(img, width=400)
+                                                    else:
+                                                        st.warning("⚠️ Could not visualize molecule")
+                                        except Exception as e:
+                                            # Fallback to basic structure
+                                            mol = Chem.MolFromSmiles(smiles)
+                                            if mol:
+                                                img = Draw.MolToImage(mol, size=(400, 400))
+                                                st.markdown("""
+                                                <div class="ios-card" style="padding: 16px; text-align: center;">
+                                                    <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                                </div>
+                                                """, unsafe_allow_html=True)
+                                                st.image(img, width=400)
+                                    else:
+                                        # Fallback to molecular structure for other featurizers
+                                        mol = Chem.MolFromSmiles(smiles)
+                                        if mol:
+                                            img = Draw.MolToImage(mol, size=(400, 400))
+                                            st.markdown("""
+                                            <div class="ios-card" style="padding: 16px; text-align: center;">
+                                                <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                            </div>
+                                            """, unsafe_allow_html=True)
+                                            st.image(img, width=400)
+                                        else:
+                                            st.warning("⚠️ Could not visualize molecule")
+                                
+                                with col2:
+                                    # Multi-class prediction results (SAME FORMAT AS SINGLE PREDICTION)
+                                    st.markdown(f"""
+                                    <div class="ios-card" style="padding: 20px;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                                            <div style="font-size: 2em; margin-right: 12px;">🎯</div>
+                                            <div>
+                                                <h2 style="color: #007AFF; margin: 0; font-weight: 700; font-size: 1.5em;">{prediction}</h2>
+                                                <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Predicted Class</p>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
+                                                <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{probability:.1%}</span>
+                                            </div>
+                                        </div>
+                                        <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
+                                            <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
+                                                <strong>SMILES:</strong> {smiles[:40]}{'...' if len(smiles) > 40 else ''}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                
+                                with col3:
+                                    # Color legend (only show for Circular Fingerprint) - SAME AS SINGLE PREDICTION
+                                    if st.session_state.selected_featurizer_name_multiclass == "Circular Fingerprint":
+                                        # High Positive
+                                        st.markdown("🔵 **High Positive (Dark Blue)**")
+                                        st.caption("Strongly contributes to activity")
+                                        
+                                        # Low Positive  
+                                        st.markdown("🟦 **Low Positive (Light Blue)**")
+                                        st.caption("Moderately supports activity")
+                                        
+                                        # Neutral
+                                        st.markdown("⚪ **Neutral (Gray)**")
+                                        st.caption("No significant contribution")
+                                        
+                                        # Low Negative
+                                        st.markdown("🟧 **Low Negative (Light Red)**")
+                                        st.caption("Moderately reduces activity")
+                                        
+                                        # High Negative
+                                        st.markdown("🔴 **High Negative (Dark Red)**")
+                                        st.caption("Strongly reduces activity")
+
                     # Display results table
-                    st.markdown("### 📊 Complete Multi-Class Results Table")
-                    st.markdown(create_ios_card("Complete Multi-Class Prediction Results", 
-                                              "Your batch prediction results with class probabilities are ready!", "📊"), unsafe_allow_html=True)
+                    st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">📊 Complete Multi-Class Results Table</h3>', unsafe_allow_html=True)
                     st.dataframe(df, use_container_width=True)
                     
-                    # Enhanced download section with multiple options
-                    st.markdown("### 💾 Download Prediction Results")
-                    st.markdown(create_ios_card("Export Options", 
-                                              "Choose your preferred format to download the prediction results.", "📥"), 
-                              unsafe_allow_html=True)
+                    # Download Section with ZIP file option
+                    st.markdown("---")
+                    st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">📥 Download Prediction Results</h3>', unsafe_allow_html=True)
                     
                     col_dl1, col_dl2, col_dl3 = st.columns(3)
                     
+                    # Simple CSV download
                     with col_dl1:
-                        # CSV download
                         csv = df.to_csv(index=False)
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         st.download_button(
-                            label="� Download as CSV",
+                            label="📄 Download CSV",
                             data=csv,
                             file_name=f'multiclass_predictions_{timestamp}.csv',
                             mime='text/csv',
-                            use_container_width=True,
-                            help="Download predictions in CSV format"
+                            use_container_width=True
                         )
                     
+                    # Excel download
                     with col_dl2:
-                        # Excel download
                         excel_buffer = io.BytesIO()
                         with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                             df.to_excel(writer, index=False, sheet_name='Predictions')
                         excel_buffer.seek(0)
-                        
                         st.download_button(
-                            label="📊 Download as Excel",
-                            data=excel_buffer.getvalue(),
+                            label="📊 Download Excel",
+                            data=excel_buffer,
                             file_name=f'multiclass_predictions_{timestamp}.xlsx',
                             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                            use_container_width=True,
-                            help="Download predictions in Excel format with formatting"
+                            use_container_width=True
                         )
                     
+                    # Complete ZIP report with all files
                     with col_dl3:
-                        # Full ZIP report download
                         try:
                             prediction_zip = create_prediction_report_zip(
-                                df,
+                                df, 
                                 smiles_col=smiles_col_predict,
                                 prediction_col='Predicted_Class',
                                 confidence_col='Confidence',
+                                individual_structures=individual_images,
                                 class_names=class_names
                             )
-                            
                             st.download_button(
-                                label="📦 Download Full Report (ZIP)",
-                                data=prediction_zip.getvalue(),
+                                label="📦 Download Full Report",
+                                data=prediction_zip,
                                 file_name=f'multiclass_prediction_report_{timestamp}.zip',
                                 mime='application/zip',
                                 use_container_width=True,
-                                help="Download complete report with CSV, Excel, summary stats, and README"
+                                help="Download complete report with CSV, summary, and individual fragment contribution maps"
                             )
                         except Exception as e:
                             st.error(f"Error creating ZIP report: {str(e)}")
