@@ -17,6 +17,12 @@ from sklearn.model_selection import train_test_split
 import seaborn as sns
 import os
 import numpy as np
+import threading
+import zipfile
+import io
+import colorsys
+import random
+import streamlit.components.v1 as components
 import colorsys
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem import rdMolDescriptors
