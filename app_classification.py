@@ -3,7 +3,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import Draw
 from tpot import TPOTClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve, confusion_matrix
 import joblib
 import base64
 import matplotlib
@@ -19,15 +19,15 @@ import os
 import numpy as np
 import colorsys
 from rdkit.Chem import rdMolDescriptors
-import colorsys
-import io
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.Draw import rdMolDraw2D
 from PIL import Image
+from datetime import datetime
+import io
+import zipfile
 import threading
 import random
-import zipfile
-from datetime import datetime
+import streamlit.components.v1 as components
 
 # Configure matplotlib and RDKit for headless mode
 os.environ['MPLBACKEND'] = 'Agg'
@@ -300,22 +300,22 @@ st.markdown("""
         height: 8px;
     }
     
-    /* Metric cards - iOS style */
+    /* Metric cards - iOS style (more compact) */
     .ios-metric {
         background: rgba(255, 255, 255, 0.9);
         backdrop-filter: blur(20px);
-        border-radius: 16px;
-        padding: 20px;
-        margin: 8px;
+        border-radius: 12px;
+        padding: 8px; /* smaller */
+        margin: 4px;  /* smaller */
         text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.3);
         transition: all 0.3s ease;
     }
     
     .ios-metric:hover {
-        transform: scale(1.02);
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        transform: scale(1.01);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
     }
     
     /* File uploader - iOS style */
@@ -457,7 +457,7 @@ st.markdown("""
         
         .ios-metric {
             margin: 4px;
-            padding: 16px;
+            padding: 6px; /* smaller on mobile */
         }
     }
     
@@ -493,10 +493,10 @@ ssl._create_default_https_context = ssl._create_unverified_context
 def create_ios_metric_card(title, value, description="", icon="📊"):
     return f"""
     <div class="ios-metric">
-        <div style="font-size: 2em; margin-bottom: 8px;">{icon}</div>
-        <h3 class="ios-text-caption" style="margin: 0; color: #007AFF; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">{title}</h3>
-        <h2 class="ios-heading-small" style="margin: 8px 0; color: #1D1D1F; font-weight: 800; font-size: 28px; letter-spacing: -0.02em;">{value}</h2>
-        <p class="ios-text-small" style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 400; line-height: 1.4;">{description}</p>
+        <div style="font-size: 1.1em; margin-bottom: 4px;">{icon}</div>
+        <h3 class="ios-text-caption" style="margin: 0; color: #007AFF; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">{title}</h3>
+        <h2 class="ios-heading-small" style="margin: 4px 0; color: #1D1D1F; font-weight: 800; font-size: 16px; letter-spacing: -0.02em;">{value}</h2>
+        <p class="ios-text-small" style="margin: 0; color: #8E8E93; font-size: 9px; font-weight: 400; line-height: 1.4;">{description}</p>
     </div>
     """
 
@@ -521,6 +521,9 @@ def create_prediction_result_card(prediction, probability, smiles):
     activity_text = "Active" if prediction == 1 else "Not Active"
     confidence_color = "#34C759" if prediction == 1 else "#FF3B30"
     
+    # Format probability safely
+    prob_display = f"{probability:.1%}" if isinstance(probability, (int, float)) and not np.isnan(probability) else "N/A"
+    
     return f"""
     <div class="ios-card">
         <div style="text-align: center;">
@@ -529,7 +532,7 @@ def create_prediction_result_card(prediction, probability, smiles):
             <div style="margin: 16px 0;">
                 <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 16px;">
                     <p class="ios-text-caption" style="margin: 0; color: #007AFF; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13px;">Confidence Score</p>
-                    <h3 class="ios-heading-small" style="margin: 4px 0 0 0; color: #1D1D1F; font-weight: 800; font-size: 24px; letter-spacing: -0.02em;">{probability:.1%}</h3>
+                    <h3 class="ios-heading-small" style="margin: 4px 0 0 0; color: #1D1D1F; font-weight: 800; font-size: 24px; letter-spacing: -0.02em;">{prob_display}</h3>
                 </div>
             </div>
             <p class="ios-text-small" style="color: #8E8E93; font-size: 14px; margin: 8px 0; line-height: 1.4;">
@@ -718,7 +721,7 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         unique_classes = df[activity_col].unique()
         if len(unique_classes) < 2:
             st.error("Not enough classes present for binary classification. Please check your dataset and ensure it has at least two distinct classes.")
-            return None, None, None, None, None, None, None, None, None, None
+            return (None,) * 15
 
         update_progress_with_time(0.15, "Featurizing molecules...")
         
@@ -756,7 +759,7 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
 
         if not features:
             st.error("No valid molecules found for featurization. Please ensure your SMILES data is correct.")
-            return None, None, None, None, None, None, None, None, None, None
+            return (None,) * 15
 
         update_progress_with_time(0.5, "Preparing training data...")
         
@@ -824,7 +827,7 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
         training_end_time = time.time()
         actual_training_time = training_end_time - training_start_time
         
-        update_progress_with_time(0.9, "Evaluating model performance...")
+        # Removed verbose evaluation status message
         
         # Model evaluation
         y_pred = tpot.predict(X_test)
@@ -857,78 +860,19 @@ def preprocess_and_model(df, smiles_col, activity_col, featurizer_name, generati
             # Create two columns for mobile-friendly layout
             col1, col2 = st.columns(2)
             
-            with col1:
-                # Plot ROC curve with better styling
-                fig_roc, ax_roc = plt.subplots(figsize=(6, 5))
-                ax_roc.plot(fpr, tpr, label=f'ROC Curve (AUC={roc_auc:.3f})', linewidth=3, color='#667eea')
-                ax_roc.plot([0, 1], [0, 1], 'k--', alpha=0.6)
-                ax_roc.fill_between(fpr, tpr, alpha=0.2, color='#667eea')
-                ax_roc.set_xlabel('False Positive Rate', fontsize=12)
-                ax_roc.set_ylabel('True Positive Rate', fontsize=12)
-                ax_roc.set_title('📊 ROC Curve', fontsize=14, fontweight='bold')
-                ax_roc.legend(loc='lower right')
-                ax_roc.grid(True, alpha=0.3)
-                plt.tight_layout()
-                st.pyplot(fig_roc)
-                # Store figure in session state for download
-                st.session_state['roc_curve_fig'] = fig_roc
-            
-            with col2:
-                # Confusion Matrix Heatmap with better styling
-                try:
-                    cm = pd.crosstab(y_test, y_pred, rownames=['Actual'], colnames=['Predicted'])
-                    fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
-                    sns.heatmap(cm, annot=True, cmap="Blues", fmt="d", ax=ax_cm, 
-                               cbar_kws={'shrink': 0.8}, square=True, linewidths=0.5)
-                    ax_cm.set_title('📈 Confusion Matrix', fontsize=14, fontweight='bold')
-                    plt.tight_layout()
-                    st.pyplot(fig_cm)
-                    # Store figure in session state for download
-                    st.session_state['confusion_matrix_fig'] = fig_cm
-                except Exception as e:
-                    st.warning(f"Could not generate confusion matrix: {str(e)}")
+            # Note: Visualization plots will be displayed in the enhanced results section below
+            # Store figures for session state
+            if roc_auc:
+                st.session_state['roc_curve_fig'] = None  # Will be created in enhanced section
+            st.session_state['confusion_matrix_fig'] = None  # Will be created in enhanced section
         else:
             st.info("ℹ️ ROC curve not available for this classification problem.")
-
-        # Display best pipeline in a nice container
-        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin: 24px 0 16px 0;">🏆 Best TPOT Pipeline</h2>', unsafe_allow_html=True)
-        with st.expander("🔍 View Pipeline Details", expanded=False):
-            try:
-                st.code(str(tpot.fitted_pipeline_), language='python')
-            except:
-                st.code("Pipeline details not available", language='text')
-
-        # Model download section
-        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin: 24px 0 16px 0;">💾 Download Trained Model</h2>', unsafe_allow_html=True)
-        
-        # Save TPOT model and X_train separately
-        model_filename = 'best_model.pkl'
-        X_train_filename = 'X_train.pkl'
-
-        try:
-            with open(model_filename, 'wb') as f_model:
-                joblib.dump(tpot.fitted_pipeline_, f_model)
-            
-            with open(X_train_filename, 'wb') as f_X_train:
-                joblib.dump(X_train, f_X_train)
-
-            # Create download buttons
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(create_downloadable_model_link(model_filename, '📥 Download Model'), unsafe_allow_html=True)
-            with col2:
-                st.markdown(create_downloadable_model_link(X_train_filename, '📥 Download Training Data'), unsafe_allow_html=True)
-        except Exception as e:
-            st.warning(f"Could not save model files: {str(e)}")
-
-        # Get feature names used in modeling
-        feature_names = list(X_train.columns)
 
         return tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer, total_training_time, actual_training_time
     
     except Exception as e:
         st.error(f"Error during training: {str(e)}")
-        return None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+        return (None,) * 15
 
 # Function to create a downloadable link for HTML content
 def create_download_link(html_content, link_text):
@@ -943,9 +887,196 @@ def create_downloadable_model_link(model_filename, link_text):
     href = f'<a href="data:file/pkl;base64,{b64}" download="{model_filename}">{link_text}</a>'
     return href
 
-# Function to interpret prediction using LIME
+# Safe ZIP report creator for model package
+def create_model_report_zip(accuracy, precision, recall, f1, roc_auc, confusion_matrix_fig=None, roc_curve_fig=None, model_params=None):
+    """Create a comprehensive model report ZIP buffer with safe formatting."""
+    buffer = io.BytesIO()
+
+    # Safely format metric values
+    def fmt_metric(val):
+        try:
+            return f"{float(val):.4f}"
+        except Exception:
+            return "N/A"
+
+    acc_s = fmt_metric(accuracy)
+    prec_s = fmt_metric(precision)
+    rec_s = fmt_metric(recall)
+    f1_s = fmt_metric(f1)
+    roc_auc_s = fmt_metric(roc_auc) if roc_auc is not None else "N/A"
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S");
+
+    # Prepare text report
+    lines = [
+        "Chemlara TPOT Classification - Model Report",
+        f"Generated: {timestamp}",
+        "",
+        "Performance Metrics:",
+        f"- Accuracy: {acc_s}",
+        f"- Precision: {prec_s}",
+        f"- Recall: {rec_s}",
+        f"- F1 Score: {f1_s}",
+        f"- ROC AUC: {roc_auc_s}",
+        "",
+        "Model Parameters:" if model_params else ""
+    ]
+
+    if model_params:
+        for k, v in model_params.items():
+            # Ensure safe string conversion
+            try:
+                if isinstance(v, float) and (k.lower().endswith('%') or 'percent' in k.lower()):
+                    v_str = f"{v:.2%}"
+                else:
+                    v_str = str(v)
+            except Exception:
+                v_str = str(v)
+            lines.append(f"- {k}: {v_str}")
+
+    text_report = "\n".join([l for l in lines if l != ""]) + "\n"
+
+    # Prepare CSV content
+    csv_header = "metric,value\n"
+    csv_rows = [
+        f"accuracy,{acc_s}",
+        f"precision,{prec_s}",
+        f"recall,{rec_s}",
+        f"f1,{f1_s}",
+        f"roc_auc,{roc_auc_s}"
+    ]
+    csv_content = csv_header + "\n".join(csv_rows) + "\n"
+
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Write reports
+        zf.writestr("model_report.txt", text_report)
+        zf.writestr("metrics.csv", csv_content)
+
+        # Write model params as a separate file for convenience
+        if model_params:
+            params_lines = [f"{k}: {v}" for k, v in model_params.items()]
+            zf.writestr("model_params.txt", "\n".join(params_lines) + "\n")
+
+        # Save figures if provided
+        if roc_curve_fig is not None:
+            try:
+                buf = io.BytesIO()
+                roc_curve_fig.savefig(buf, format='png', dpi=200, bbox_inches='tight')
+                buf.seek(0)
+                zf.writestr('images/roc_curve.png', buf.read())
+            except Exception:
+                pass
+        if confusion_matrix_fig is not None:
+            try:
+                buf = io.BytesIO()
+                confusion_matrix_fig.savefig(buf, format='png', dpi=200, bbox_inches='tight')
+                buf.seek(0)
+                zf.writestr('images/confusion_matrix.png', buf.read())
+            except Exception:
+                pass
+
+        # Add a simple README
+        readme = (
+            "This ZIP contains the model performance reports and optional visualizations.\n"
+            "To reproduce predictions, also download the model files included elsewhere in the package.\n"
+        )
+        zf.writestr("README.txt", readme)
+
+    buffer.seek(0)
+    return buffer
+
+# NEW: Binary batch prediction ZIP report creator (parity with multi-class)
+def create_prediction_report_zip(predictions_df, smiles_col, prediction_col, confidence_col, individual_structures=None):
+    """Create a ZIP file containing all binary prediction outputs (CSV, summary, images)."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 1) Full predictions CSV
+        csv_buffer = io.StringIO()
+        predictions_df.to_csv(csv_buffer, index=False)
+        zip_file.writestr(f"binary_predictions_{timestamp}.csv", csv_buffer.getvalue())
+
+        # 2) Summary text
+        summary_lines = [
+            "="*40,
+            "CHEMLARA BINARY BATCH PREDICTION",
+            "="*40,
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "",
+            "PREDICTION STATISTICS",
+            "-"*20,
+            f"Total Molecules: {len(predictions_df)}",
+            "",
+        ]
+        if prediction_col in predictions_df.columns:
+            summary_lines.append("CLASS DISTRIBUTION")
+            summary_lines.append("-"*20)
+            counts = predictions_df[prediction_col].value_counts()
+            for cls, cnt in counts.items():
+                pct = (cnt/len(predictions_df))*100 if len(predictions_df) else 0
+                summary_lines.append(f"{cls}: {cnt} ({pct:.1f}%)")
+            summary_lines.append("")
+        if confidence_col in predictions_df.columns:
+            summary_lines.append("CONFIDENCE STATISTICS")
+            summary_lines.append("-"*20)
+            try:
+                conf_vals = predictions_df[confidence_col].apply(
+                    lambda x: float(str(x).strip('%'))/100 if isinstance(x, str) and '%' in str(x)
+                    else float(x) if pd.notna(x) else 0.0
+                )
+                summary_lines.append(f"Mean Confidence: {conf_vals.mean():.2%}")
+                summary_lines.append(f"Min Confidence:  {conf_vals.min():.2%}")
+                summary_lines.append(f"Max Confidence:  {conf_vals.max():.2%}")
+            except Exception:
+                pass
+            summary_lines.append("")
+        # Note: include per-class prob columns if present
+        for col in [c for c in predictions_df.columns if c.startswith('Prob_')]:
+            summary_lines.append(f"Includes probability column: {col}")
+        zip_file.writestr(f"binary_prediction_summary_{timestamp}.txt", "\n".join(summary_lines))
+
+        # 3) Individual images
+        if individual_structures:
+            base = "individual_predictions/"
+            for idx, images in enumerate(individual_structures):
+                if isinstance(images, dict):
+                    if images.get('fragment_map') is not None:
+                        buf = io.BytesIO()
+                        images['fragment_map'].save(buf, format='PNG', dpi=(300, 300))
+                        buf.seek(0)
+                        zip_file.writestr(f"{base}molecule_{idx+1}_fragment_map.png", buf.getvalue())
+                    if images.get('structure') is not None:
+                        buf = io.BytesIO()
+                        images['structure'].save(buf, format='PNG')
+                        buf.seek(0)
+                        zip_file.writestr(f"{base}molecule_{idx+1}_structure.png", buf.getvalue())
+        
+        # 4) README
+        readme = f"""
+# Chemlara Binary Batch Prediction Report
+
+This archive contains outputs from your binary batch prediction.
+
+Files:
+1. binary_predictions_{timestamp}.csv - Full predictions
+2. binary_prediction_summary_{timestamp}.txt - Summary stats
+3. individual_predictions/ - Fragment maps and structures (if available)
+
+Columns:
+- {smiles_col}: Input SMILES
+- {prediction_col}: Predicted class (Active / Not Active)
+- {confidence_col}: Confidence for predicted class
+- Prob_Not Active, Prob_Active: Per-class probabilities (if present)
+"""
+        zip_file.writestr("README.txt", readme)
+
+    zip_buffer.seek(0)
+    return zip_buffer
+
+# Function to interpret prediction using LIME (classification)
 def interpret_prediction(tpot_model, input_features, X_train):
-    # Create LIME explainer using X_train
+    """Return an HTML string with LIME explanation for a classification model."""
     explainer = lime_tabular.LimeTabularExplainer(
         training_data=X_train.values,
         mode="classification",
@@ -954,16 +1085,14 @@ def interpret_prediction(tpot_model, input_features, X_train):
         verbose=True,
         discretize_continuous=True
     )
-    
+
     explanation = explainer.explain_instance(
         input_features.values[0],
         tpot_model.predict_proba,
         num_features=len(input_features.columns)
     )
 
-    # Generate HTML explanation
-    html_explanation = explanation.as_html()
-    return html_explanation
+    return explanation.as_html()
 
 # --- Fragment Contribution Mapping for Circular Fingerprint ---
 
@@ -988,7 +1117,6 @@ def weight_to_google_color(weight, min_weight, max_weight):
 def create_download_button_for_image(image, filename, button_text="📥 Download Image"):
     """Create a download button for PIL images"""
     try:
-        import io
         buf = io.BytesIO()
         image.save(buf, format='PNG', dpi=(300, 300))
         buf.seek(0)
@@ -1294,6 +1422,54 @@ def render_navigation_bar():
     st.markdown("</div>", unsafe_allow_html=True)
     return st.session_state.class_active_tab
 
+# Function to create iOS-style section title
+def create_ios_section_title(title, emoji="", size="large"):
+    """Create iOS-style section title with gradient background"""
+    if size == "large":
+        return f"""
+        <div style="
+            background: linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(88, 86, 214, 0.1) 100%);
+            border-left: 4px solid #007AFF;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin: 24px 0 16px 0;
+        ">
+            <h3 style="
+                margin: 0;
+                color: #007AFF;
+                font-weight: 700;
+                font-size: 1.5em;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            ">
+                {emoji} {title}
+            </h3>
+        </div>
+        """
+    else:  # small/medium
+        return f"""
+        <div style="
+            background: linear-gradient(135deg, rgba(0, 122, 255, 0.08) 0%, rgba(88, 86, 214, 0.08) 100%);
+            border-left: 3px solid #007AFF;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 16px 0 12px 0;
+        ">
+            <h4 style="
+                margin: 0;
+                color: #007AFF;
+                font-weight: 600;
+                font-size: 1.2em;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            ">
+                {emoji} {title}
+            </h4>
+        </div>
+        """
+
 # Main Streamlit application
 def main():
     # Initialize selected featurizer name session variable
@@ -1320,7 +1496,7 @@ def main():
                    """, "🎉"), unsafe_allow_html=True)
 
     elif active_tab == "build":
-        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin-bottom: 24px;">🔬 Build Your ML Model</h2>', unsafe_allow_html=True)
+        st.markdown(create_ios_section_title("Build Your ML Model", "🔬"), unsafe_allow_html=True)
         
         with st.expander("📁 Upload Training Data", expanded=True):
             uploaded_file = st.file_uploader("Upload Excel file with SMILES and Activity", type=["xlsx"], 
@@ -1396,301 +1572,418 @@ def main():
                         df, smiles_col, activity_col, st.session_state.selected_featurizer_name, 
                         generations=generations, cv=cv, verbosity=verbosity, test_size=test_size)
                     
-                    if len(result) == 15:  # New format with timing
+                    if not result or len(result) != 15:
+                        st.error("Training failed. Please check your dataset and settings.")
+                    else:
                         tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer, total_time, training_time = result
-                    else:  # Fallback for old format
-                        tpot, accuracy, precision, recall, f1, roc_auc, X_test, y_test, y_pred, df, X_train, y_train, featurizer = result
-                        total_time = training_time = None
 
-                    if tpot is not None:
-                        # Store which featurizer was used for training
-                        st.session_state['trained_featurizer_name'] = st.session_state.selected_featurizer_name
-                        
-                        # Display model metrics in cards
-                        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin: 24px 0 16px 0;">📈 Model Performance</h2>', unsafe_allow_html=True)
-                        
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.markdown(create_ios_metric_card("Accuracy", f"{accuracy:.3f}", "Overall correctness", "🎯"), unsafe_allow_html=True)
-                            st.markdown(create_ios_metric_card("Precision", f"{precision:.3f}", "True positive rate", "✅"), unsafe_allow_html=True)
-                        with col2:
-                            st.markdown(create_ios_metric_card("Recall", f"{recall:.3f}", "Sensitivity", "🔍"), unsafe_allow_html=True)
-                            st.markdown(create_ios_metric_card("F1 Score", f"{f1:.3f}", "Harmonic mean", "⚖️"), unsafe_allow_html=True)
-                        with col3:
-                            if roc_auc is not None:
-                                st.markdown(create_ios_metric_card("ROC AUC", f"{roc_auc:.3f}", "Area under curve", "📊"), unsafe_allow_html=True)
+                        if tpot is not None:
+                            # Store which featurizer was used for training
+                            st.session_state['trained_featurizer_name'] = st.session_state.selected_featurizer_name
                             
-                            # Enhanced success message with timing
-                            if total_time is not None:
-                                st.success(f"✅ Model trained successfully!\n⏱️ Total time: {format_time_duration(total_time)}")
-                            else:
-                                st.success("✅ Model trained successfully!")
-                        
-                        # Store metrics and figures in session state for download
-                        st.session_state['model_metrics'] = {
-                            'accuracy': accuracy,
-                            'precision': precision,
-                            'recall': recall,
-                            'f1': f1,
-                            'roc_auc': roc_auc,
-                            'generations': generations,
-                            'cv_folds': cv,
-                            'test_size': test_size
-                        }
-                        
-                        # Download Model Report Button
-                        st.markdown("---")
-                        st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">📦 Download Complete Model Report</h3>', unsafe_allow_html=True)
-                        
-                        col_dl1, col_dl2 = st.columns([3, 1])
-                        with col_dl1:
-                            st.markdown("Download all model outputs including metrics, visualizations, and reports in a single ZIP file.", unsafe_allow_html=True)
-                        with col_dl2:
-                            # Get stored figures from session state if they exist
-                            confusion_fig = st.session_state.get('confusion_matrix_fig', None)
-                            roc_fig = st.session_state.get('roc_curve_fig', None)
+                            # Display model metrics in cards
+                            st.markdown(create_ios_section_title("Model Performance", "📈"), unsafe_allow_html=True)
                             
-                            # Create model report ZIP
-                            model_params = {
-                                'Generations': generations,
-                                'CV Folds': cv,
-                                'Test Size': test_size,
-                                'Verbosity': verbosity,
-                                'Featurizer': st.session_state.selected_featurizer_name
-                            }
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.markdown(create_ios_metric_card("Accuracy", f"{accuracy:.3f}", "Overall correctness", "🎯"), unsafe_allow_html=True)
+                                st.markdown(create_ios_metric_card("Precision", f"{precision:.3f}", "True positive rate", "✅"), unsafe_allow_html=True)
+                            with col2:
+                                st.markdown(create_ios_metric_card("Recall", f"{recall:.3f}", "Sensitivity", "🔍"), unsafe_allow_html=True)
+                                st.markdown(create_ios_metric_card("F1 Score", f"{f1:.3f}", "Harmonic mean", "⚖️"), unsafe_allow_html=True)
+                            with col3:
+                                if roc_auc is not None:
+                                    st.markdown(create_ios_metric_card("ROC AUC", f"{roc_auc:.3f}", "Area under curve", "📊"), unsafe_allow_html=True)
                             
-                            zip_buffer = create_model_report_zip(
-                                accuracy, precision, recall, f1, roc_auc,
-                                confusion_matrix_fig=confusion_fig,
-                                roc_curve_fig=roc_fig,
-                                model_params=model_params
-                            )
+                            # Success message (no training time shown)
+                            st.success("✅ Model trained successfully!")
+
+                            # Best TPOT Pipeline section
+                            st.markdown(create_ios_section_title("Best TPOT Pipeline", "🏆"), unsafe_allow_html=True)
+                            with st.expander("View Pipeline Details", expanded=False):
+                                st.code(str(tpot.fitted_pipeline_), language='python')
+
+                            # Visualizations in 2 columns
+                            col1, col2 = st.columns(2)
+                            roc_fig = None
+                            cm_fig = None
+
+                            with col1:
+                                try:
+                                    if roc_auc is not None and hasattr(tpot, 'predict_proba') and len(set(y_test)) == 2:
+                                        y_proba = tpot.predict_proba(X_test)[:, 1]
+                                        fpr, tpr, thresholds = roc_curve(y_test, y_proba)
+                                        fig_roc, ax_roc = plt.subplots(figsize=(6, 5))
+                                        ax_roc.plot(fpr, tpr, label=f'ROC Curve (AUC={roc_auc:.3f})', linewidth=3, color='#667eea')
+                                        ax_roc.plot([0, 1], [0, 1], 'k--', alpha=0.6)
+                                        ax_roc.fill_between(fpr, tpr, alpha=0.2, color='#667eea')
+                                        ax_roc.set_xlabel('False Positive Rate', fontsize=12)
+                                        ax_roc.set_ylabel('True Positive Rate', fontsize=12)
+                                        ax_roc.set_title('📊 ROC Curve', fontsize=14, fontweight='bold')
+                                        ax_roc.legend(loc='lower right')
+                                        ax_roc.grid(True, alpha=0.3)
+                                        plt.tight_layout()
+                                        st.pyplot(fig_roc)
+                                        st.session_state['roc_curve_fig'] = fig_roc
+                                        roc_fig = fig_roc
+                                    else:
+                                        st.info("ℹ️ ROC curve not available for this classification problem.")
+                                except Exception as e:
+                                    st.error(f"ROC Error: {str(e)}")
+                                    st.info("ℹ️ ROC curve not available for this classification problem.")
+
+                            with col2:
+                                try:
+                                    cm = pd.crosstab(y_test, y_pred, rownames=['Actual'], colnames=['Predicted'])
+                                    fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
+                                    sns.heatmap(cm, annot=True, cmap="Blues", fmt="d", ax=ax_cm, 
+                                                cbar_kws={'shrink': 0.8}, square=True, linewidths=0.5)
+                                    ax_cm.set_title('📈 Confusion Matrix', fontsize=14, fontweight='bold')
+                                    plt.tight_layout()
+                                    st.pyplot(fig_cm)
+                                    st.session_state['confusion_matrix_fig'] = fig_cm
+                                    cm_fig = fig_cm
+                                except Exception as e:
+                                    st.error(f"CM Error: {str(e)}")
+                                    st.info("ℹ️ Confusion matrix not available for this classification problem.")
+
+                            # Model download section with comprehensive ZIP package
+                            st.markdown(create_ios_section_title("Download Trained Model", "💾"), unsafe_allow_html=True)
                             
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            st.download_button(
-                                label="📥 Download Report",
-                                data=zip_buffer,
-                                file_name=f"model_report_{timestamp}.zip",
-                                mime="application/zip",
-                                use_container_width=True
-                            )
+                            # Save TPOT model and related files
+                            model_filename = 'best_model.pkl'
+                            label_encoder_filename = 'label_encoder.pkl'
+                            X_train_filename = 'X_train.pkl'
+                            featurizer_filename = 'featurizer.pkl'
+
+                            try:
+                                with open(model_filename, 'wb') as f_model:
+                                    joblib.dump(tpot.fitted_pipeline_, f_model)
+                                
+                                with open(X_train_filename, 'wb') as f_X_train:
+                                    joblib.dump(X_train, f_X_train)
+                                
+                                with open(featurizer_filename, 'wb') as f_feat:
+                                    joblib.dump(featurizer, f_feat)
+                                
+                                # Generate sample LIME interpretation and save
+                                lime_sample_filename = 'lime_interpretation_sample.html'
+                                try:
+                                    # Create a sample LIME interpretation using the first test sample
+                                    if len(X_test) > 0:
+                                        sample_features = pd.DataFrame([X_test.iloc[0]], columns=X_train.columns if hasattr(X_train, 'columns') else None)
+                                        lime_html = interpret_prediction(tpot.fitted_pipeline_, sample_features, X_train)
+                                        if lime_html:
+                                            with open(lime_sample_filename, 'w', encoding='utf-8') as f_lime:
+                                                f_lime.write(f"""
+                                                <!DOCTYPE html>
+                                                <html>
+                                                <head><title>LIME Interpretation Sample - Binary Classification</title></head>
+                                                <body>
+                                                    <h1>LIME Interpretation Sample</h1>
+                                                    <p>This is a sample interpretation for the first test sample.</p>
+                                                    {lime_html}
+                                                </body>
+                                                </html>
+                                                """)
+                                except Exception as lime_error:
+                                    pass  # Silent error handling
+
+                                # Create comprehensive model configuration details
+                                model_config = {
+                                    'smiles_column': smiles_col,
+                                    'activity_column': activity_col,
+                                    'featurizer': st.session_state.selected_featurizer_name,
+                                    'generations': generations,
+                                    'cv_folds': cv,
+                                    'verbosity': verbosity,
+                                    'test_size': test_size,
+                                    'total_samples': len(df),
+                                    'training_samples': len(X_train),
+                                    'test_samples': len(X_test),
+                                    'classification_type': 'binary',
+                                }
+                                
+                                # Add CFP-specific parameters if applicable
+                                if st.session_state.selected_featurizer_name == "Circular Fingerprint":
+                                    model_config['cfp_radius'] = st.session_state.get('cfp_radius', 4)
+                                    model_config['cfp_size'] = st.session_state.get('cfp_size', 2048)
+                                
+                                # Create comprehensive model package ZIP
+                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                try:
+                                    # Prepare model parameters for the report
+                                    model_params = {
+                                        'TPOT Generations': generations,
+                                        'Cross-Validation Folds': cv,
+                                        'Test Size': f"{test_size:.2%}" if test_size and isinstance(test_size, (int, float)) else str(test_size),
+                                        'Featurizer': st.session_state.selected_featurizer_name,
+                                        'Total Samples': len(df),
+                                        'Training Samples': len(X_train),
+                                        'Test Samples': len(X_test),
+                                        'Classification Type': 'Binary'
+                                    }
+                                    
+                                    if st.session_state.selected_featurizer_name == "Circular Fingerprint":
+                                        model_params['CFP Radius'] = st.session_state.get('cfp_radius', 4)
+                                        model_params['CFP Size'] = st.session_state.get('cfp_size', 2048)
+                                    
+                                    # Create comprehensive model report ZIP
+                                    model_package_zip = create_model_report_zip(
+                                        accuracy=accuracy,
+                                        precision=precision,
+                                        recall=recall,
+                                        f1=f1,
+                                        roc_auc=roc_auc,
+                                        confusion_matrix_fig=cm_fig,
+                                        roc_curve_fig=roc_fig,
+                                        model_params=model_params
+                                    )
+                                    
+                                    # Add model files to the ZIP
+                                    zip_buffer = io.BytesIO(model_package_zip.getvalue())
+                                    
+                                    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
+                                        # Add model files
+                                        with open(model_filename, 'rb') as f:
+                                            zip_file.writestr(f"model_files/{model_filename}", f.read())
+                                        with open(X_train_filename, 'rb') as f:
+                                            zip_file.writestr(f"model_files/{X_train_filename}", f.read())
+                                        with open(featurizer_filename, 'rb') as f:
+                                            zip_file.writestr(f"model_files/{featurizer_filename}", f.read())
+                                        
+                                        
+                                        # Add LIME sample if available
+                                        if os.path.exists(lime_sample_filename):
+                                            with open(lime_sample_filename, 'r', encoding='utf-8') as f:
+                                                zip_file.writestr(f"model_files/{lime_sample_filename}", f.read())
+                                        
+                                        # Add model configuration JSON
+                                        import json
+                                        config_json = json.dumps(model_config, indent=2, default=str)
+                                        zip_file.writestr(f"model_configuration_{timestamp}.json", config_json)
+                                        
+                                        # Add pipeline details
+                                        try:
+                                            pipeline_details = str(tpot.fitted_pipeline_)
+                                            zip_file.writestr(f"best_pipeline_{timestamp}.txt", pipeline_details)
+                                        except:
+                                            pass
+                                    
+                                    zip_buffer.seek(0)
+                                    
+                                    # Display comprehensive download button
+                                    st.download_button(
+                                        label="📦 Download Complete Model Package (ZIP)",
+                                        data=zip_buffer.getvalue(),
+                                                                               file_name=f'binary_model_package_{timestamp}.zip',
+                                                                                                                                                             mime='application/zip',
+                                        use_container_width=True,
+                                        help="Complete package with model files, configuration, performance metrics, and visualizations"
+                                    )
+                                    
+                                except Exception as zip_error:
+                                    st.error(f"Error creating model package ZIP: {str(zip_error)}")
+                                
+                                # Individual file downloads (optional)
+                                with st.expander("📂 Download Individual Model Files"):
+                                    col1, col2, col3, col4 = st.columns(4)
+                                    with col1:
+                                        st.markdown(create_downloadable_model_link(model_filename, '📥 Model'), unsafe_allow_html=True)
+                                    with col2:
+                                        st.markdown(create_downloadable_model_link(X_train_filename, '📥 Training Data'), unsafe_allow_html=True)
+                                    with col3:
+                                        st.markdown(create_downloadable_model_link(featurizer_filename, '📥 Featurizer'), unsafe_allow_html=True)
+                                    with col4:
+                                        if os.path.exists(lime_sample_filename):
+                                            st.markdown(create_downloadable_model_link(lime_sample_filename, '📥 LIME Sample'), unsafe_allow_html=True)
+                            except Exception as e:
+                                st.warning(f"Could not save model files: {str(e)}")
 
     elif active_tab == "predict":
-        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin-bottom: 24px;">🧪 Single SMILES Prediction</h2>', unsafe_allow_html=True)
+        st.markdown(create_ios_section_title("Single SMILES Prediction", "🧪"), unsafe_allow_html=True)
         
-        # Initialize clear input flag
-        if 'clear_input' not in st.session_state:
-            st.session_state['clear_input'] = False
-        
-        # Handle clear input
-        default_value = "" if st.session_state.get('clear_input', False) else None
-        if st.session_state.get('clear_input', False):
-            st.session_state['clear_input'] = False
-        
-        smile_input = st.text_input("Enter SMILES string for prediction", 
-                                  value=default_value,
-                                  placeholder="e.g., CCO (ethanol)",
-                                  help="Enter a valid SMILES string representing your molecule",
-                                  label_visibility="collapsed")
-        
-        # Set default cfp_number for atomic contribution mapping
-        cfp_number = None
+        smile_input = st.text_input(
+            "Enter SMILES string", 
+            value="", 
+            placeholder="e.g., CCO (ethanol)",
+            help="Enter the SMILES representation of the molecule",
+            label_visibility="collapsed"
+        )
         
         col1, col2 = st.columns([3, 1])
         with col1:
-            predict_button = st.button("🔮 Predict Activity", use_container_width=True)
+            predict_button = st.button("🔮 Predict Activity", use_container_width=True, key="predict_single_binary_btn")
         with col2:
-            if st.button("🧹 Clear", use_container_width=True):
-                # Clear the input by setting a session state flag instead of rerunning
-                st.session_state['clear_input'] = True
+            if st.button("🧹 Clear", use_container_width=True, key="clear_single_binary_btn"):
                 st.rerun()
 
         if predict_button and smile_input:
-            with st.spinner("🔍 Analyzing molecule..."):
-                prediction, probability, explanation_html = predict_from_single_smiles(smile_input, st.session_state.selected_featurizer_name)
+            # Load trained model and training features
+            try:
+                with open('best_model.pkl', 'rb') as f_model, \
+                     open('X_train.pkl', 'rb') as f_X_train:
+                    tpot_model = joblib.load(f_model)
+                    X_train = joblib.load(f_X_train)
+                # Optional featurizer
+                try:
+                    with open('featurizer.pkl', 'rb') as f_feat:
+                        featurizer_loaded = joblib.load(f_feat)
+                    st.session_state['_featurizer_obj'] = featurizer_loaded
+                except Exception:
+                    featurizer_loaded = None
+            except FileNotFoundError:
+                st.error("❌ No trained model found. Please build a model first in the 'Build Model' tab.")
+                st.stop()
+
+            with st.spinner("🔍 Analyzing molecule for prediction..."):
+                prediction, probability, explanation_html = predict_from_single_smiles(
+                    smile_input, st.session_state.selected_featurizer_name
+                )
                 
                 if prediction is not None:
-                    # Three-column layout: structure, prediction results, and model explanation
-                    col1, col2, col3 = st.columns([2, 1, 1])
+                    # Prepare display values
+                    pred_label = "Active" if int(prediction) == 1 else "Not Active"
+                    prob_value = probability if isinstance(probability, (int, float, np.floating)) else None
                     
-                    with col1:
-                        # Display atomic contribution map instead of structure
-                        try:
-                            trained_featurizer = st.session_state.get('trained_featurizer_name')
-                            current_featurizer = st.session_state.selected_featurizer_name
-                            
-                            if (trained_featurizer == "Circular Fingerprint" and 
-                                current_featurizer == "Circular Fingerprint"):
+                    # Three-column layout for results
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    
+                    with c1:
+                        # Display fragment contribution map for Circular Fingerprint
+                        if st.session_state.selected_featurizer_name == "Circular Fingerprint":
+                            try:
+                                # Get featurizer/model/X_train
+                                featurizer_obj = st.session_state.get('_featurizer_obj') or featurizer_loaded or Featurizer[st.session_state.selected_featurizer_name]
+                                model_obj = st.session_state.get('_tpot_model', tpot_model)
+                                X_train_obj = st.session_state.get('_X_train', X_train)
                                 
-                                model = st.session_state.get('_tpot_model')
-                                X_train = st.session_state.get('_X_train')
-                                featurizer_obj = st.session_state.get('_featurizer_obj')
+                                with st.spinner("🗺️ Generating high-resolution fragment contribution map..."):
+                                    atomic_contrib_img = generate_fragment_contribution_map(
+                                        smile_input, model_obj, X_train_obj, featurizer_obj, cfp_number=None
+                                    )
                                 
-                                if model is not None and X_train is not None and featurizer_obj is not None:
-                                    with st.spinner("🧬 Generating high-resolution atomic contribution map..."):
-                                        atomic_contrib_img = generate_fragment_contribution_map(
-                                            smile_input, model, X_train, featurizer_obj, cfp_number
-                                        )
-                                    
-                                    if atomic_contrib_img:
+                                if atomic_contrib_img is not None:
+                                    st.markdown("""
+                                    <div class="ios-card" style="padding: 16px; text-align: center;">
+                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🗺️ Fragment Contribution Map</h4>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.image(atomic_contrib_img, width=500)
+                                    safe_smiles = smile_input.replace('/', '_').replace('\\', '_')[:20]
+                                    create_download_button_for_image(
+                                        atomic_contrib_img,
+                                        f"atomic_contribution_{safe_smiles}.png",
+                                        "📥 Download HD Image"
+                                    )
+                                else:
+                                    mol = Chem.MolFromSmiles(smile_input)
+                                    if mol is not None:
+                                        img = Draw.MolToImage(mol, size=(400, 400))
                                         st.markdown("""
                                         <div class="ios-card" style="padding: 16px; text-align: center;">
-                                            <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Atomic Contribution Map</h4>
+                                            <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
                                         </div>
                                         """, unsafe_allow_html=True)
-                                        
-                                        # Create two columns: image and color legend
-                                        img_col, legend_col = st.columns([3, 1])
-                                        
-                                        with img_col:
-                                            # Display larger, high-resolution image
-                                            st.image(atomic_contrib_img, width=500)
-                                        
-                                        with legend_col:
-                                            # Color legend using Streamlit components
-                                            
-                                            # High Positive
-                                            st.markdown("🔵 **High Positive (Dark Blue)**")
-                                            st.caption("Strongly contributes to activity")
-                                            
-                                            # Low Positive  
-                                            st.markdown("🟦 **Low Positive (Light Blue)**")
-                                            st.caption("Moderately supports activity")
-                                            
-                                            # Neutral
-                                            st.markdown("⚪ **Neutral (Gray)**")
-                                            st.caption("No significant contribution")
-                                            
-                                            # Low Negative
-                                            st.markdown("🟧 **Low Negative (Light Red)**")
-                                            st.caption("Moderately reduces activity")
-                                            
-                                            # High Negative
-                                            st.markdown("🔴 **High Negative (Dark Red)**")
-                                            st.caption("Strongly reduces activity")
-                                        
-                                        # Download button for the high-resolution image
-                                        create_download_button_for_image(
-                                            atomic_contrib_img, 
-                                            f"atomic_contribution_{smile_input.replace('/', '_')}.png",
-                                            "📥 Download HD Image"
-                                        )
+                                        st.image(img, width=400)
                                     else:
-                                        # Try basic molecule visualization as fallback
-                                        mol = Chem.MolFromSmiles(smile_input)
-                                        if mol:
-                                            img = Draw.MolToImage(mol, size=(400, 400))
-                                            st.markdown("""
-                                            <div class="ios-card" style="padding: 16px; text-align: center;">
-                                                <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
-                                            </div>
-                                            """, unsafe_allow_html=True)
-                                            st.image(img, width=400)
-                                        else:
-                                            st.warning("⚠️ Could not visualize molecule")
-                                else:
-                                    st.warning("⚠️ Model not available for visualization")
+                                        st.warning("⚠️ Could not visualize molecule")
+                            except Exception as e:
+                                st.warning(f"⚠️ Could not generate atomic contribution map: {str(e)}")
+                                mol = Chem.MolFromSmiles(smile_input)
+                                if mol is not None:
+                                    img = Draw.MolToImage(mol, size=(400, 400))
+                                    st.markdown("""
+                                    <div class="ios-card" style="padding: 16px; text-align: center;">
+                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    st.image(img, width=400)
+                        else:
+                            mol = Chem.MolFromSmiles(smile_input)
+                            if mol is not None:
+                                img = Draw.MolToImage(mol, size=(400, 400))
+                                st.markdown("""
+                                <div class="ios-card" style="padding: 16px; text-align: center;">
+                                    <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.image(img, width=400)
                             else:
-                                # Fallback to molecular structure for other featurizers
-                                mol = Chem.MolFromSmiles(smile_input)
-                                if mol:
-                                    img = Draw.MolToImage(mol, size=(400, 400))
-                                    st.markdown("""
-                                    <div class="ios-card" style="padding: 16px; text-align: center;">
-                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    st.image(img, width=400)
-                                else:
-                                    st.warning("⚠️ Could not visualize molecule")
-                        except Exception as e:
-                            # Show basic structure as fallback
-                            try:
-                                mol = Chem.MolFromSmiles(smile_input)
-                                if mol:
-                                    img = Draw.MolToImage(mol, size=(400, 400))
-                                    st.markdown("""
-                                    <div class="ios-card" style="padding: 16px; text-align: center;">
-                                        <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🧬 Molecule Structure</h4>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    st.image(img, width=400)
-                            except:
                                 st.warning("⚠️ Could not visualize molecule")
                     
-                    with col2:
-                        # Prediction results in compact iOS card
-                        activity_icon = "🟢" if prediction == "Active" else "🔴"
-                        confidence_color = "#34C759" if prediction == "Active" else "#FF3B30"
-                        
+                    with c2:
+                        # Binary prediction results (mirroring multi-class card style)
                         st.markdown(f"""
-                        <div class="ios-card" style="padding: 16px; margin: 8px 0;">
-                            <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                                <div style="font-size: 2em; margin-right: 12px;">{activity_icon}</div>
+                        <div class="ios-card" style="padding: 20px;">
+                            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                                <div style="font-size: 2em; margin-right: 12px;">🎯</div>
                                 <div>
-                                    <h3 class="ios-heading-small" style="color: {confidence_color}; margin: 0; font-weight: 800; font-size: 24px; letter-spacing: -0.015em;">{activity_text}</h3>
-                                    <p class="ios-text-caption" style="margin: 4px 0 0 0; color: #8E8E93; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13px;">Prediction Result</p>
+                                    <h2 style="color: #007AFF; margin: 0; font-weight: 700; font-size: 1.5em;">{pred_label}</h2>
+                                    <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Predicted Class</p>
                                 </div>
                             </div>
                             <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span class="ios-text-caption" style="color: #007AFF; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Confidence Score:</span>
-                                    <span class="ios-text-regular" style="color: #1D1D1F; font-weight: 800; font-size: 20px; letter-spacing: -0.01em;">{probability:.1%}</span>
+                                    <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
+                                    <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{(prob_value if prob_value is not None else 0):.1%}</span>
                                 </div>
                             </div>
                             <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
-                                <p class="ios-text-small" style="margin: 0; color: #8E8E93; font-size: 11px; font-weight: 500; line-height: 1.4;">
-                                    <strong style="font-weight: 600;">SMILES:</strong> {smile_input[:50]}{'...' if len(smile_input) > 50 else ''}
+                                <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
+                                    <strong>SMILES:</strong> {smile_input}
                                 </p>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
                     
-                    with col3:
-                        # LIME explanation in proper iOS card style
-                        if explanation_html:
-                            st.markdown(f"""
-                            <div class="ios-card" style="padding: 16px; margin: 8px 0;">
-                                <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                                    <div style="font-size: 2em; margin-right: 12px;">🔍</div>
-                                    <div>
-                                        <h3 style="color: #007AFF; margin: 0; font-weight: 600; font-size: 18px;">Model Explanation</h3>
-                                        <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 12px;">Understand the prediction</p>
-                                    </div>
-                                </div>
-                                <a href="data:text/html;base64,{base64.b64encode(explanation_html.encode()).decode()}" 
-                                   download="LIME_Explanation_{smile_input.replace('/', '_')}.html" 
-                                   style="background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%); 
-                                          color: white; 
-                                          text-decoration: none; 
-                                          padding: 12px 16px; 
-                                          border-radius: 12px; 
-                                          font-size: 14px;
-                                          font-weight: 600;
-                                          display: inline-block;
-                                          width: 100%;
-                                          text-align: center;
-                                          box-sizing: border-box;
-                                          transition: all 0.2s ease;">
-                                    📥 Download LIME Explanation
-                                </a>
-                            </div>
-                            """, unsafe_allow_html=True)
-
+                    with c3:
+                        # Color legend (for CFP)
+                        if st.session_state.selected_featurizer_name == "Circular Fingerprint":
+                            st.markdown("🔵 **High Positive (Dark Blue)**")
+                            st.caption("Strongly contributes to activity")
+                            st.markdown("🟦 **Low Positive (Light Blue)**")
+                            st.caption("Moderately supports activity")
+                            st.markdown("⚪ **Neutral (Gray)**")
+                            st.caption("No significant contribution")
+                            st.markdown("🟧 **Low Negative (Light Red)**")
+                            st.caption("Moderately reduces activity")
+                            st.markdown("🔴 **High Negative (Dark Red)**")
+                            st.caption("Strongly reduces activity")
+                    
+                    # Show LIME explanation (HTML)
+                    if explanation_html:
+                        with st.expander("🧠 LIME Explanation", expanded=False):
+                            # Render full HTML safely in an isolated iframe to avoid showing raw HTML junk
+                            components.html(explanation_html, height=420, scrolling=True)
+                            # Optional: allow users to download the raw HTML file
+                            st.download_button(
+                                label="📥 Download LIME HTML",
+                                data=explanation_html.encode("utf-8"),
+                                file_name="lime_explanation.html",
+                                mime="text/html",
+                                use_container_width=True
+                            )
                 else:
                     st.error("❌ Failed to make prediction. Please check your SMILES input.")
 
     elif active_tab == "batch":
-        st.markdown('<h2 class="ios-heading-medium" style="color: #1D1D1F; font-weight: 700; font-size: 28px; letter-spacing: -0.022em; margin-bottom: 24px;">📊 Batch Prediction from File</h2>', unsafe_allow_html=True)
+        st.markdown(create_ios_section_title("Batch Prediction", "📊"), unsafe_allow_html=True)
         
         with st.expander("📁 Upload Prediction File", expanded=True):
-            uploaded_file = st.file_uploader("Upload Excel file with SMILES for batch prediction", 
-                                            type=["xlsx"], key="batch_upload",
-                                            help="Select an Excel file containing SMILES strings for batch prediction")
+            uploaded_file = st.file_uploader(
+                "Upload Excel file with SMILES for batch prediction", 
+                type=["xlsx"], key="batch_prediction_upload_bin",
+                help="Select an Excel file containing SMILES strings for batch prediction"
+            )
 
         if uploaded_file is not None:
             # Read Excel file
-            df = pd.read_excel(uploaded_file)
+            try:
+                df = pd.read_excel(uploaded_file)
+            except Exception as e:
+                st.error(f"Error reading Excel file: {e}")
+                st.stop()
 
             with st.expander("📊 Preview Data", expanded=False):
                 st.dataframe(df.head(), use_container_width=True)
@@ -1698,506 +1991,234 @@ def main():
             # Select SMILES column in iOS card
             st.markdown('<div class="ios-card">', unsafe_allow_html=True)
             col_names = df.columns.tolist()
-            smiles_col_predict = st.selectbox("🧬 Select SMILES Column", col_names, key='smiles_column_predict')
+            smiles_col_predict = st.selectbox("🧬 Select SMILES Column", col_names, key='smiles_column_predict_bin')
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # Batch prediction button
-            if st.button("🚀 Run Batch Prediction", use_container_width=True):
-                # Check if model exists
+            if st.button("🚀 Run Batch Prediction", use_container_width=True, key="batch_predict_btn_bin"):
+                # Load model and related artifacts
                 try:
-                    with open('best_model.pkl', 'rb') as f_model, open('X_train.pkl', 'rb') as f_X_train:
+                    with open('best_model.pkl', 'rb') as f_model, \
+                         open('X_train.pkl', 'rb') as f_X_train:
                         tpot_model = joblib.load(f_model)
                         X_train = joblib.load(f_X_train)
+                    try:
+                        with open('featurizer.pkl', 'rb') as f_feat:
+                            featurizer_obj = joblib.load(f_feat)
+                    except Exception:
+                        # Build featurizer from current selection
+                        if st.session_state.get('selected_featurizer_name') == "Circular Fingerprint":
+                            radius = st.session_state.get('cfp_custom_radius', 4)
+                            size = st.session_state.get('cfp_custom_size', 2048)
+                            featurizer_obj = dc.feat.CircularFingerprint(size=size, radius=radius)
+                        else:
+                            featurizer_obj = Featurizer[st.session_state.get('selected_featurizer_name', 'Circular Fingerprint')]
+                    # Store refs for visuals
+                    st.session_state['_tpot_model'] = tpot_model
+                    st.session_state['_X_train'] = X_train
+                    st.session_state['_featurizer_obj'] = featurizer_obj
                 except FileNotFoundError:
                     st.error("❌ No trained model found. Please build a model first in the 'Build Model' tab.")
-                    return
+                    st.stop()
 
-                if smiles_col_predict in df.columns:
-                    predictions = []
-                    probabilities = []
-                    
-                    # iOS-style progress tracking
-                    st.markdown(create_ios_card("Processing Molecules", 
-                                              "Analyzing your molecules using the trained model...", "⚗️"), unsafe_allow_html=True)
-                    
-                    progress_container = st.container()
-                    with progress_container:
-                        progress_bar = st.progress(0)
-                        status_text = st.empty()
-                    
-                    total_molecules = len(df)
-                    
-                    for index, row in df.iterrows():
-                        # Update progress with iOS styling
-                        progress = (index + 1) / total_molecules
-                        progress_bar.progress(progress)
-                        status_text.markdown(f"<div style='text-align: center; color: #007AFF; font-weight: 600;'>Processing molecule {index + 1} of {total_molecules}</div>", unsafe_allow_html=True)
-                        
-                        try:
-                            standardized_smiles = standardize_smiles(row[smiles_col_predict])
-                            if standardized_smiles:
-                                mol = Chem.MolFromSmiles(standardized_smiles)
-                                if mol is not None:
-                                    featurizer = Featurizer[st.session_state.selected_featurizer_name]
-                                    features = featurizer.featurize([mol])[0]
-                                    feature_df = pd.DataFrame([features], columns=[f"fp_{i}" for i in range(len(features))])
-                                    feature_df = feature_df.astype(float)
+                predictions = []
+                probabilities = []
+                class_probabilities = []
+                individual_images = []
 
-                                    # Predict
-                                    prediction = tpot_model.predict(feature_df)[0]
-                                    probability = tpot_model.predict_proba(feature_df)[0][1] if hasattr(tpot_model, 'predict_proba') else None
+                # Progress
+                progress_container = st.container()
+                with progress_container:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                total = len(df)
 
-                                    predictions.append("Active" if prediction == 1 else "Not Active")
-                                    probabilities.append(probability if probability is not None else 0.0)
-                                else:
-                                    predictions.append("Invalid SMILES")
-                                    probabilities.append(0.0)
-                            else:
-                                predictions.append("Invalid SMILES")
-                                probabilities.append(0.0)
-                        except Exception as e:
-                            predictions.append(f"Error: {str(e)}")
-                            probabilities.append(0.0)
+                for idx, row in df.iterrows():
+                    progress = (idx + 1) / total if total else 1.0
+                    progress_bar.progress(progress)
+                    status_text.markdown(f"<div style='text-align:center;color:#007AFF;font-weight:600;'>Processing molecule {idx+1} of {total}</div>", unsafe_allow_html=True)
+                    try:
+                        standardized_smiles = standardize_smiles(str(row[smiles_col_predict]))
+                        if not standardized_smiles:
+                            raise ValueError("Invalid SMILES")
+                        mol = Chem.MolFromSmiles(standardized_smiles)
+                        if mol is None:
+                            raise ValueError("Invalid SMILES")
 
-                    # Clear progress indicators
-                    progress_container.empty()
-                    st.success("🎉 Batch prediction completed successfully!")
-                    
-                    # Add results to dataframe
-                    df['Predicted_Activity'] = predictions
-                    df['Confidence'] = [f"{p:.1%}" if isinstance(p, float) else "N/A" for p in probabilities]
+                        # Featurize and predict
+                        feats = featurizer_obj.featurize([mol])[0]
+                        feature_df = pd.DataFrame([feats])
+                        feature_df.columns = [f"fp_{c}" for c in feature_df.columns]
+                        pred_raw = tpot_model.predict(feature_df)[0]
+                        proba = tpot_model.predict_proba(feature_df)[0] if hasattr(tpot_model, 'predict_proba') else np.array([1.0 - float(pred_raw), float(pred_raw)])
+                        pred_label = "Active" if int(pred_raw) == 1 else "Not Active"
+                        max_prob = float(proba[int(pred_raw)]) if proba is not None and len(proba) > int(pred_raw) else 0.0
 
-                    # Display individual results first in iOS cards
-                    st.markdown("### 🧪 Individual Prediction Results")
-                    
-                    # Show results in expandable sections for better organization
-                    results_per_page = 5  # Show 5 results at a time
-                    total_valid_molecules = sum(1 for p in predictions if p in ["Active", "Not Active"])
-                    
-                    if total_valid_molecules > 0:
-                        # Create pagination for large datasets
-                        num_pages = (total_valid_molecules + results_per_page - 1) // results_per_page
-                        
-                        if num_pages > 1:
-                            page = st.selectbox("📄 Select Results Page", 
-                                              options=list(range(1, num_pages + 1)), 
-                                              format_func=lambda x: f"Page {x} ({min(results_per_page, total_valid_molecules - (x-1)*results_per_page)} results)")
+                        predictions.append(pred_label)
+                        probabilities.append(max_prob)
+                        if proba is not None and len(proba) == 2:
+                            class_probabilities.append([float(proba[0]), float(proba[1])])
                         else:
-                            page = 1
-                        
-                        # Calculate indices for current page
-                        valid_indices = [i for i, p in enumerate(predictions) if p in ["Active", "Not Active"]]
-                        start_idx = (page - 1) * results_per_page
-                        end_idx = min(start_idx + results_per_page, len(valid_indices))
-                        current_page_indices = valid_indices[start_idx:end_idx]
-                        
-                        # Display individual results for current page
-                        for idx in current_page_indices:
-                            row = df.iloc[idx]
-                            prediction = predictions[idx]
-                            probability = probabilities[idx]
-                            smiles = row[smiles_col_predict]
-                            
-                            with st.expander(f"🧬 Molecule {idx + 1}: {prediction} ({probability:.1%} confidence)", expanded=False):
-                                # Create three columns for structure, results, and additional info
-                                col1, col2, col3 = st.columns([2, 1, 1])
-                                
-                                with col1:
-                                    # Display molecular structure - try atomic contribution if available
+                            class_probabilities.append([1.0 - max_prob, max_prob])
+
+                        # Images
+                        image_data = {}
+                        try:
+                            if st.session_state.get('selected_featurizer_name') == "Circular Fingerprint":
+                                fmap = generate_fragment_contribution_map(standardized_smiles, tpot_model, X_train, featurizer_obj, cfp_number=None)
+                                if fmap is not None:
+                                    image_data['fragment_map'] = fmap
+                        except Exception:
+                            pass
+                        try:
+                            structure_img = Draw.MolToImage(mol, size=(400, 400))
+                            image_data['structure'] = structure_img
+                        except Exception:
+                            pass
+                        individual_images.append(image_data)
+                    except Exception as e:
+                        predictions.append(f"Error: {str(e)}")
+                        probabilities.append(0.0)
+                        class_probabilities.append([0.0, 0.0])
+                        individual_images.append({})
+
+                progress_container.empty()
+
+                # Build results dataframe
+                df['Predicted_Class'] = predictions
+                df['Confidence'] = [f"{p:.1%}" if isinstance(p, float) else "N/A" for p in probabilities]
+                df['Prob_Not Active'] = [f"{probs[0]:.1%}" if len(probs) > 0 else "N/A" for probs in class_probabilities]
+                df['Prob_Active'] = [f"{probs[1]:.1%}" if len(probs) > 1 else "N/A" for probs in class_probabilities]
+
+                # Individual results (paginated)
+                st.markdown(create_ios_section_title("Individual Prediction Results", "🧪"), unsafe_allow_html=True)
+                results_per_page = 5
+                valid_indices = [i for i, p in enumerate(predictions) if not str(p).startswith("Error") and p != "Invalid SMILES"]
+                total_valid = len(valid_indices)
+                if total_valid > 0:
+                    num_pages = (total_valid + results_per_page - 1) // results_per_page
+                    page = st.selectbox("📄 Select Results Page", options=list(range(1, num_pages + 1)) if num_pages > 1 else [1], 
+                                        format_func=lambda x: f"Page {x} ({min(results_per_page, total_valid - (x-1)*results_per_page)} results)",
+                                        key='batch_page_selector_bin')
+                    start_idx = (page - 1) * results_per_page
+                    end_idx = min(start_idx + results_per_page, total_valid)
+                    for pos in range(start_idx, end_idx):
+                        i = valid_indices[pos]
+                        row = df.iloc[i]
+                        pred_label = predictions[i]
+                        prob = probabilities[i]
+                        smiles_val = row[smiles_col_predict]
+
+                        with st.expander(f"🧬 Molecule {i + 1}: {pred_label} ({prob:.1%} confidence)", expanded=False):
+                            col1, col2, col3 = st.columns([2, 1, 1])
+                            with col1:
+                                if st.session_state.get('selected_featurizer_name') == "Circular Fingerprint":
                                     try:
-                                        trained_featurizer = st.session_state.get('trained_featurizer_name')
-                                        current_featurizer = st.session_state.selected_featurizer_name
-                                        
-                                        if (trained_featurizer == "Circular Fingerprint" and 
-                                            current_featurizer == "Circular Fingerprint"):
-                                            
-                                            # Try to get stored model components
-                                            model = st.session_state.get('_tpot_model')
-                                            X_train_data = st.session_state.get('_X_train')
-                                            featurizer_obj = st.session_state.get('_featurizer_obj')
-                                            
-                                            if model is not None and X_train_data is not None and featurizer_obj is not None:
-                                                st.markdown("#### 🧬 Atomic Contribution Map")
-                                                frag_img = generate_fragment_contribution_map(smiles, model, X_train_data, featurizer_obj, None)
-                                                if frag_img:
-                                                    st.image(frag_img, width=400, caption="")
-                                                    
-                                                    # Create download button for the image
-                                                    create_download_button_for_image(
-                                                        frag_img, 
-                                                        f"atomic_contribution_molecule_{idx + 1}.png",
-                                                        "📥 Download Image"
-                                                    )
-                                                else:
-                                                    # Fallback to basic structure
-                                                    mol = Chem.MolFromSmiles(smiles)
-                                                    if mol:
-                                                        img = Draw.MolToImage(mol, size=(300, 300))
-                                                        st.markdown("#### 🧬 Molecule Structure")
-                                                        st.image(img, width=300)
-                                            else:
-                                                # Basic structure display
-                                                mol = Chem.MolFromSmiles(smiles)
-                                                if mol:
-                                                    img = Draw.MolToImage(mol, size=(300, 300))
-                                                    st.markdown("#### 🧬 Molecule Structure")
-                                                    st.image(img, width=300)
-                                        else:
-                                            # Basic structure for other featurizers
-                                            mol = Chem.MolFromSmiles(smiles)
-                                            if mol:
-                                                img = Draw.MolToImage(mol, size=(300, 300))
-                                                st.markdown("#### 🧬 Molecule Structure")
-                                                st.image(img, width=300)
-                                    except Exception as e:
-                                        # Fallback structure display
-                                        try:
-                                            mol = Chem.MolFromSmiles(smiles)
-                                            if mol:
-                                                img = Draw.MolToImage(mol, size=(300, 300))
-                                                st.markdown("#### 🧬 Molecule Structure")
-                                                st.image(img, width=300)
-                                        except:
+                                        fmap_img = generate_fragment_contribution_map(smiles_val, tpot_model, X_train, featurizer_obj, cfp_number=None)
+                                        if fmap_img is not None:
                                             st.markdown("""
                                             <div class="ios-card" style="padding: 16px; text-align: center;">
-                                                <h4 style="margin: 0; color: #8E8E93;">Structure unavailable</h4>
+                                                <h4 style="margin: 0 0 8px 0; color: #007AFF; font-weight: 600; font-size: 16px;">🗺️ Fragment Contribution Map</h4>
                                             </div>
                                             """, unsafe_allow_html=True)
-                                
-                                with col2:
-                                    # Prediction results in compact iOS card
-                                    activity_icon = "🟢" if prediction == "Active" else "🔴"
-                                    confidence_color = "#34C759" if prediction == "Active" else "#FF3B30"
-                                    
-                                    st.markdown(f"""
-                                    <div class="ios-card" style="padding: 12px; margin: 8px 0;">
-                                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                                            <div style="font-size: 1.5em; margin-right: 8px;">{activity_icon}</div>
-                                            <div>
-                                                <h3 style="color: {confidence_color}; margin: 0; font-weight: 700; font-size: 1.1em;">{prediction}</h3>
-                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 10px;">Prediction Result</p>
-                                            </div>
-                                        </div>
-                                        <div style="background: rgba(0, 122, 255, 0.1); border-radius: 8px; padding: 8px; margin-bottom: 8px;">
-                                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                                <span style="color: #007AFF; font-weight: 600; font-size: 12px;">Confidence:</span>
-                                                <span style="color: #1D1D1F; font-weight: 700; font-size: 14px;">{probability:.1%}</span>
-                                            </div>
-                                        </div>
-                                        <div style="background: rgba(0, 0, 0, 0.05); border-radius: 6px; padding: 6px;">
-                                            <p style="margin: 0; color: #8E8E93; font-size: 10px; font-weight: 500; line-height: 1.4;">
-                                                <strong>SMILES:</strong> {smiles[:30]}{'...' if len(smiles) > 30 else ''}
-                                            </p>
+                                            st.image(fmap_img, width=500)
+                                            create_download_button_for_image(
+                                                fmap_img,
+                                                f"fragment_contribution_molecule_{i + 1}.png",
+                                                "📥 Download HD Image"
+                                            )
+                                        else:
+                                            mol = Chem.MolFromSmiles(smiles_val)
+                                            if mol is not None:
+                                                st.image(Draw.MolToImage(mol, size=(400, 400)), width=400)
+                                    except Exception:
+                                        mol = Chem.MolFromSmiles(smiles_val)
+                                        if mol is not None:
+                                            st.image(Draw.MolToImage(mol, size=(400, 400)), width=400)
+                            with col2:
+                                st.markdown(f"""
+                                <div class="ios-card" style="padding: 20px;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 16px;">
+                                        <div style="font-size: 2em; margin-right: 12px;">{'🟢' if pred_label == 'Active' else '🔴'}</div>
+                                        <div>
+                                            <h2 style="color: {'#34C759' if pred_label == 'Active' else '#FF3B30'}; margin: 0; font-weight: 700; font-size: 1.5em;">{pred_label}</h2>
+                                            <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 14px;">Predicted Class</p>
                                         </div>
                                     </div>
-                                    """, unsafe_allow_html=True)
-                                
-                                with col3:
-                                    # Additional data and information in compact card
-                                    other_columns = [col for col in row.index if col != smiles_col_predict and not col.startswith('Predicted_') and col != 'Confidence']
-                                    
-                                    st.markdown(f"""
-                                    <div class="ios-card" style="padding: 12px; margin: 8px 0;">
-                                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                                            <div style="font-size: 1.5em; margin-right: 8px;">📋</div>
-                                            <div>
-                                                <h3 style="color: #007AFF; margin: 0; font-weight: 600; font-size: 14px;">Additional Data</h3>
-                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 10px;">Molecule {idx + 1} info</p>
-                                            </div>
+                                    <div style="background: rgba(0, 122, 255, 0.1); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span style="color: #007AFF; font-weight: 600;">Confidence:</span>
+                                            <span style="color: #1D1D1F; font-weight: 700; font-size: 1.1em;">{prob:.1%}</span>
                                         </div>
-                                        <div style="background: rgba(0, 0, 0, 0.02); border-radius: 6px; padding: 8px;">
-                                    """, unsafe_allow_html=True)
-                                    
-                                    if other_columns:
-                                        for col in other_columns[:3]:  # Limit to first 3 additional columns
-                                            value = str(row[col])
-                                            if len(value) > 20:
-                                                value = value[:20] + "..."
-                                            st.markdown(f"""
-                                            <p style="margin: 2px 0; color: #1D1D1F; font-size: 11px;">
-                                                <strong>{col}:</strong> {value}
-                                            </p>
-                                            """, unsafe_allow_html=True)
-                                        
-                                        if len(other_columns) > 3:
-                                            st.markdown(f"""
-                                            <p style="margin: 4px 0 0 0; color: #8E8E93; font-size: 10px; font-style: italic;">
-                                                +{len(other_columns) - 3} more fields...
-                                            </p>
-                                            """, unsafe_allow_html=True)
-                                    else:
-                                        st.markdown("""
-                                        <p style="margin: 0; color: #8E8E93; font-size: 11px; font-style: italic;">
-                                            No additional data
+                                    </div>
+                                    <div style="background: rgba(0, 0, 0, 0.05); border-radius: 8px; padding: 8px;">
+                                        <p style="margin: 0; color: #8E8E93; font-size: 12px; font-weight: 500;">
+                                            <strong>SMILES:</strong> {str(smiles_val)[:40]}{'...' if isinstance(smiles_val, str) and len(smiles_val) > 40 else ''}
                                         </p>
-                                        """, unsafe_allow_html=True)
-                                    
-                                    st.markdown("</div></div>", unsafe_allow_html=True)
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            with col3:
+                                if st.session_state.get('selected_featurizer_name') == "Circular Fingerprint":
+                                    st.markdown("🔵 **High Positive (Dark Blue)**")
+                                    st.caption("Strongly contributes to activity")
+                                    st.markdown("🟦 **Low Positive (Light Blue)**")
+                                    st.caption("Moderately supports activity")
+                                    st.markdown("⚪ **Neutral (Gray)**")
+                                    st.caption("No significant contribution")
+                                    st.markdown("🟧 **Low Negative (Light Red)**")
+                                    st.caption("Moderately reduces activity")
+                                    st.markdown("🔴 **High Negative (Dark Red)**")
+                                    st.caption("Strongly reduces activity")
 
-                    # Display table results
-                    st.markdown("### 📊 Complete Results Table")
-                    # Display table results in iOS card
-                    st.markdown(create_ios_card("Complete Prediction Results", 
-                                              "Your batch prediction results are ready!", "📊"), unsafe_allow_html=True)
-                    st.dataframe(df, use_container_width=True)
-                    
-                    # Download Section with ZIP file option
-                    st.markdown("---")
-                    st.markdown('<h3 class="ios-heading-small" style="color: #1D1D1F; font-weight: 600; font-size: 22px; letter-spacing: -0.02em; margin: 16px 0 12px 0;">📥 Download Prediction Results</h3>', unsafe_allow_html=True)
-                    
-                    col_dl1, col_dl2, col_dl3 = st.columns(3)
-                    
-                    # Simple CSV download
-                    with col_dl1:
-                        csv = df.to_csv(index=False)
-                        st.download_button(
-                            label="� Download CSV",
-                            data=csv,
-                            file_name=f'batch_predictions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
-                            mime='text/csv',
-                            use_container_width=True
-                        )
-                    
-                    # Excel download
-                    with col_dl2:
-                        excel_buffer = io.BytesIO()
-                        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                            df.to_excel(writer, index=False, sheet_name='Predictions')
-                        excel_buffer.seek(0)
-                        st.download_button(
-                            label="📊 Download Excel",
-                            data=excel_buffer,
-                            file_name=f'batch_predictions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
-                            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                            use_container_width=True
-                        )
-                    
-                    # Complete ZIP report with all files
-                    with col_dl3:
-                        prediction_zip = create_prediction_report_zip(
-                            df, 
-                            smiles_col='SMILES',
-                            prediction_col='Predicted_Activity',
-                            confidence_col='Confidence'
+                # Results table
+                st.markdown(create_ios_section_title("Complete Results Table", "📊"), unsafe_allow_html=True)
+                st.dataframe(df, use_container_width=True)
+
+                # Downloads: CSV, Excel, ZIP
+                st.markdown("---")
+                st.markdown(create_ios_section_title("Download Prediction Results", "📥"), unsafe_allow_html=True)
+                dl1, dl2, dl3 = st.columns(3)
+                with dl1:
+                    csv_data = df.to_csv(index=False)
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    st.download_button(
+                        label="📄 Download CSV",
+                        data=csv_data,
+                        file_name=f'binary_predictions_{ts}.csv',
+                        mime='text/csv',
+                        use_container_width=True
+                    )
+                with dl2:
+                    xbuf = io.BytesIO()
+                    with pd.ExcelWriter(xbuf, engine='openpyxl') as writer:
+                        df.to_excel(writer, index=False, sheet_name='Predictions')
+                    xbuf.seek(0)
+                    st.download_button(
+                        label="📊 Download Excel",
+                        data=xbuf,
+                        file_name=f'binary_predictions_{ts}.xlsx',
+                        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        use_container_width=True
+                    )
+                with dl3:
+                    try:
+                        zip_buf = create_prediction_report_zip(
+                            df,
+                            smiles_col=smiles_col_predict,
+                            prediction_col='Predicted_Class',
+                            confidence_col='Confidence',
+                            individual_structures=individual_images
                         )
                         st.download_button(
                             label="📦 Download Full Report",
-                            data=prediction_zip,
-                            file_name=f'prediction_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip',
+                            data=zip_buf,
+                            file_name=f'binary_prediction_report_{ts}.zip',
                             mime='application/zip',
                             use_container_width=True,
-                            help="Download complete report with CSV, Excel, and summary statistics"
+                            help="ZIP with CSV, summary, and individual images"
                         )
-                    
-                    # Summary statistics in iOS cards
-                    st.markdown("### 📈 Summary Statistics")
-                    active_count = sum(1 for p in predictions if p == "Active")
-                    total_valid = sum(1 for p in predictions if p in ["Active", "Not Active"])
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.markdown(create_ios_metric_card("Total Processed", str(len(df)), "molecules", "⚗️"), unsafe_allow_html=True)
-                    with col2:
-                        st.markdown(create_ios_metric_card("Active Compounds", str(active_count), f"out of {total_valid}", "✅"), unsafe_allow_html=True)
-                    with col3:
-                        if total_valid > 0:
-                            active_rate = (active_count / total_valid) * 100
-                            st.markdown(create_ios_metric_card("Activity Rate", f"{active_rate:.1f}%", "predicted active", "📊"), unsafe_allow_html=True)
-                else:
-                    st.error("❌ SMILES column not found in the uploaded file.")
-
-# Function to create a ZIP report of the model training results
-def create_model_report_zip(accuracy, precision, recall, f1, roc_auc, 
-                             confusion_matrix_fig=None, roc_curve_fig=None,
-                             feature_importance_fig=None, model_params=None):
-    """Create a ZIP file containing all modeling outputs and reports"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # 1. Create metrics report (TXT)
-        metrics_report = f"""
-========================================
-    CHEMLARA MODEL TRAINING REPORT
-========================================
-Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-MODEL PERFORMANCE METRICS
-------------------------
-Accuracy:  {accuracy:.4f}
-Precision: {precision:.4f}
-Recall:    {recall:.4f}
-F1 Score:  {f1:.4f}
-ROC AUC:   {roc_auc:.4f if roc_auc else 'N/A'}
-
-MODEL DESCRIPTION
------------------
-Type: AutoML Binary Classification (TPOT)
-Optimization: Genetic Algorithm Pipeline Search
-Cross-Validation: Stratified K-Fold
-
-INTERPRETATION
---------------
-- Accuracy: Overall model correctness ({accuracy*100:.2f}% of predictions are correct)
-- Precision: {precision*100:.2f}% of positive predictions are actually positive  
-- Recall: Model captures {recall*100:.2f}% of all actual positive cases
-- F1 Score: Harmonic mean of precision and recall
-- ROC AUC: {f'Model discrimination ability ({roc_auc:.4f})' if roc_auc else 'Not available'}
-
-"""
-        if model_params:
-            metrics_report += f"\nMODEL PARAMETERS\n----------------\n"
-            for key, value in model_params.items():
-                metrics_report += f"{key}: {value}\n"
-        
-        zip_file.writestr(f"model_metrics_report_{timestamp}.txt", metrics_report)
-        
-        # 2. Create metrics CSV
-        metrics_df = pd.DataFrame({
-            'Metric': ['Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC AUC'],
-            'Value': [accuracy, precision, recall, f1, roc_auc if roc_auc else 0.0]
-        })
-        csv_buffer = io.StringIO()
-        metrics_df.to_csv(csv_buffer, index=False)
-        zip_file.writestr(f"model_metrics_{timestamp}.csv", csv_buffer.getvalue())
-        
-        # 3. Save confusion matrix figure
-        if confusion_matrix_fig is not None:
-            img_buffer = io.BytesIO()
-            confusion_matrix_fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
-            img_buffer.seek(0)
-            zip_file.writestr(f"confusion_matrix_{timestamp}.png", img_buffer.getvalue())
-        
-        # 4. Save ROC curve figure
-        if roc_curve_fig is not None:
-            img_buffer = io.BytesIO()
-            roc_curve_fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
-            img_buffer.seek(0)
-            zip_file.writestr(f"roc_curve_{timestamp}.png", img_buffer.getvalue())
-        
-        # 5. Save feature importance figure
-        if feature_importance_fig is not None:
-            img_buffer = io.BytesIO()
-            feature_importance_fig.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight')
-            img_buffer.seek(0)
-            zip_file.writestr(f"feature_importance_{timestamp}.png", img_buffer.getvalue())
-        
-        # 6. Create README
-        readme_content = """
-# Chemlara Model Training Report
-
-This folder contains all outputs from your model training session.
-
-## Files Included:
-
-1. **model_metrics_report_[timestamp].txt** - Detailed text report with all metrics and interpretation
-2. **model_metrics_[timestamp].csv** - Metrics in CSV format for easy import
-3. **confusion_matrix_[timestamp].png** - Visual confusion matrix (if available)
-4. **roc_curve_[timestamp].png** - ROC curve visualization (if available)
-5. **feature_importance_[timestamp].png** - Feature importance plot (if available)
-
-## How to Use:
-
-- Review the text report for a complete summary
-- Import the CSV into Excel or other tools for further analysis
-- Use the PNG images in presentations or reports
-
-Generated by Chemlara Predictor
-"""
-        zip_file.writestr("README.txt", readme_content)
-    
-    zip_buffer.seek(0)
-    return zip_buffer
-
-# Function to create a ZIP report of the prediction results
-def create_prediction_report_zip(predictions_df, smiles_col='SMILES', 
-                                   prediction_col='Predicted_Activity',
-                                   confidence_col='Confidence',
-                                   individual_structures=None):
-    """Create a ZIP file containing all prediction outputs"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # 1. Save full predictions as CSV
-        csv_buffer = io.StringIO()
-        predictions_df.to_csv(csv_buffer, index=False)
-        zip_file.writestr(f"predictions_{timestamp}.csv", csv_buffer.getvalue())
-        
-        # 2. Save predictions as Excel with formatting
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            predictions_df.to_excel(writer, index=False, sheet_name='Predictions')
-        excel_buffer.seek(0)
-        zip_file.writestr(f"predictions_{timestamp}.xlsx", excel_buffer.getvalue())
-        
-        # 3. Create summary statistics
-        summary_stats = f"""
-========================================
-  CHEMLARA BATCH PREDICTION SUMMARY
-========================================
-Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-PREDICTION STATISTICS
---------------------
-Total Molecules: {len(predictions_df)}
-"""
-        if prediction_col in predictions_df.columns:
-            value_counts = predictions_df[prediction_col].value_counts()
-            for category, count in value_counts.items():
-                percentage = (count / len(predictions_df)) * 100
-                summary_stats += f"{category}: {count} ({percentage:.1f}%)\n"
-        
-        if confidence_col in predictions_df.columns:
-            summary_stats += f"\nCONFIDENCE STATISTICS\n--------------------\n"
-            # Extract numeric confidence values
-            confidences = predictions_df[confidence_col].apply(
-                lambda x: float(x.strip('%'))/100 if isinstance(x, str) and '%' in x else x
-            )
-            summary_stats += f"Mean Confidence: {confidences.mean():.2%}\n"
-            summary_stats += f"Min Confidence:  {confidences.min():.2%}\n"
-            summary_stats += f"Max Confidence:  {confidences.max():.2%}\n"
-        
-        zip_file.writestr(f"prediction_summary_{timestamp}.txt", summary_stats)
-        
-        # 4. Save individual molecular structures if provided
-        if individual_structures:
-            structures_folder = "molecular_structures/"
-            for idx, (smiles, img_bytes) in enumerate(individual_structures):
-                if img_bytes:
-                    zip_file.writestr(f"{structures_folder}molecule_{idx+1}.png", img_bytes)
-        
-        # 5. Create README
-        readme_content = f"""
-# Chemlara Batch Prediction Report
-
-This folder contains all outputs from your batch prediction session.
-
-## Files Included:
-
-1. **predictions_{timestamp}.csv** - Predictions in CSV format
-2. **predictions_{timestamp}.xlsx** - Predictions in Excel format with formatting
-3. **prediction_summary_{timestamp}.txt** - Statistical summary of predictions
-4. **molecular_structures/** - Individual molecular structure images (if available)
-
-## Column Descriptions:
-
-- **{smiles_col}**: Input SMILES string
-- **{prediction_col}**: Predicted activity class
-- **{confidence_col}**: Model confidence in prediction
-
-## How to Use:
-
-- Open the CSV/Excel file in your preferred spreadsheet software
-- Review the summary for overall statistics
-- View individual molecular structures in the structures folder
-
-Generated by Chemlara Predictor
-"""
-        zip_file.writestr("README.txt", readme_content)
-    
-    zip_buffer.seek(0)
-    return zip_buffer
+                    except Exception as e:
+                        st.error(f"Error creating ZIP report: {str(e)}")
 
 if __name__ == "__main__":
     main()

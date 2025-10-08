@@ -30,6 +30,8 @@ def create_model_report_zip(accuracy, precision, recall, f1, roc_auc=None,
     
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         # 1. Create metrics report (TXT)
+        roc_auc_value = f"{roc_auc:.4f}" if roc_auc is not None else 'N/A'
+        roc_auc_msg = f"Model discrimination ability ({roc_auc:.4f})" if roc_auc is not None else 'Not available'
         metrics_report = f"""
 ========================================
     CHEMLARA MODEL TRAINING REPORT
@@ -42,7 +44,7 @@ Accuracy:  {accuracy:.4f}
 Precision: {precision:.4f}
 Recall:    {recall:.4f}
 F1 Score:  {f1:.4f}
-ROC AUC:   {roc_auc:.4f if roc_auc else 'N/A'}
+ROC AUC:   {roc_auc_value}
 
 MODEL DESCRIPTION
 -----------------
@@ -56,20 +58,20 @@ INTERPRETATION
 - Precision: {precision*100:.2f}% of positive predictions are actually positive  
 - Recall: Model captures {recall*100:.2f}% of all actual positive cases
 - F1 Score: Harmonic mean of precision and recall
-- ROC AUC: {f'Model discrimination ability ({roc_auc:.4f})' if roc_auc else 'Not available'}
+- ROC AUC: {roc_auc_msg}
 
 """
         if model_params:
-            metrics_report += f"\\nMODEL PARAMETERS\\n----------------\\n"
+            metrics_report += f"\nMODEL PARAMETERS\n----------------\n"
             for key, value in model_params.items():
-                metrics_report += f"{key}: {value}\\n"
+                metrics_report += f"{key}: {value}\n"
         
         zip_file.writestr(f"model_metrics_report_{timestamp}.txt", metrics_report)
         
         # 2. Create metrics CSV
         metrics_df = pd.DataFrame({
             'Metric': ['Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC AUC'],
-            'Value': [accuracy, precision, recall, f1, roc_auc if roc_auc else 0.0]
+            'Value': [accuracy, precision, recall, f1, roc_auc if roc_auc is not None else 0.0]
         })
         csv_buffer = io.StringIO()
         metrics_df.to_csv(csv_buffer, index=False)
