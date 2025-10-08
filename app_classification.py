@@ -1782,8 +1782,8 @@ def main():
                                     st.download_button(
                                         label="📦 Download Complete Model Package (ZIP)",
                                         data=zip_buffer.getvalue(),
-                                        file_name=f'binary_model_package_{timestamp}.zip',
-                                        mime='application/zip',
+                                                                               file_name=f'binary_model_package_{timestamp}.zip',
+                                                                                                                                                             mime='application/zip',
                                         use_container_width=True,
                                         help="Complete package with model files, configuration, performance metrics, and visualizations"
                                     )
@@ -2175,7 +2175,7 @@ def main():
                                     st.caption("Moderately reduces activity")
                                     st.markdown("🔴 **High Negative (Dark Red)**")
                                     st.caption("Strongly reduces activity")
-                    
+
                 # Results table
                 st.markdown(create_ios_section_title("Complete Results Table", "📊"), unsafe_allow_html=True)
                 st.dataframe(df, use_container_width=True)
@@ -2226,6 +2226,5 @@ def main():
                     except Exception as e:
                         st.error(f"Error creating ZIP report: {str(e)}")
 
-# Entrypoint so this app runs when executed directly or via the suite loader
 if __name__ == "__main__":
     main()
