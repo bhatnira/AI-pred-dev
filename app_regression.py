@@ -17,6 +17,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import os
+import io
+import zipfile
+import json
+from datetime import datetime
+from PIL import Image
+import traceback
+import colorsys
+import random
 
 # Configure matplotlib and RDKit for headless mode
 os.environ['MPLBACKEND'] = 'Agg'
@@ -789,10 +797,250 @@ def plot_predicted_vs_true(y_true, y_pred):
     plt.tight_layout()
     return fig
 
+# Function to create model performance report ZIP
+def create_model_performance_zip(mse, rmse, mae, r2, y_test, y_pred, model_params=None, 
+                                 predicted_vs_true_fig=None, residuals_fig=None):
+    """Create a comprehensive ZIP file with model performance metrics and visualizations"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    buffer = io.BytesIO()
+    
+    # Create text report
+    text_report = f"""
+{'='*60}
+CHEMLARA REGRESSION MODEL PERFORMANCE REPORT
+{'='*60}
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+REGRESSION METRICS
+{'-'*60}
+R² Score (Coefficient of Determination): {r2:.6f}
+Root Mean Squared Error (RMSE):          {rmse:.6f}
+Mean Absolute Error (MAE):               {mae:.6f}
+Mean Squared Error (MSE):                {mse:.6f}
+
+INTERPRETATION
+{'-'*60}
+R² Score: {r2:.6f}
+  - Closer to 1.0 indicates better model fit
+  - {r2*100:.2f}% of variance in the target is explained by the model
+
+RMSE: {rmse:.6f}
+  - Average prediction error in same units as target variable
+  - Lower values indicate better predictions
+
+MAE: {mae:.6f}
+  - Average absolute difference between predicted and true values
+  - More interpretable than MSE, less sensitive to outliers
+
+"""
+    
+    # Add model parameters if provided
+    if model_params:
+        text_report += f"\nMODEL CONFIGURATION\n{'-'*60}\n"
+        for key, value in model_params.items():
+            text_report += f"{key}: {value}\n"
+    
+    # Add prediction statistics
+    text_report += f"""
+PREDICTION STATISTICS
+{'-'*60}
+Number of Test Samples:     {len(y_test)}
+Mean True Value:            {np.mean(y_test):.6f}
+Mean Predicted Value:       {np.mean(y_pred):.6f}
+Std True Value:             {np.std(y_test):.6f}
+Std Predicted Value:        {np.std(y_pred):.6f}
+Min True Value:             {np.min(y_test):.6f}
+Max True Value:             {np.max(y_test):.6f}
+Min Predicted Value:        {np.min(y_pred):.6f}
+Max Predicted Value:        {np.max(y_pred):.6f}
+
+{'='*60}
+End of Report
+{'='*60}
+"""
+    
+    # Create CSV with metrics
+    csv_header = "metric,value\n"
+    csv_rows = [
+        f"r2_score,{r2}",
+        f"rmse,{rmse}",
+        f"mae,{mae}",
+        f"mse,{mse}",
+        f"mean_true,{np.mean(y_test)}",
+        f"mean_predicted,{np.mean(y_pred)}",
+        f"std_true,{np.std(y_test)}",
+        f"std_predicted,{np.std(y_pred)}"
+    ]
+    csv_content = csv_header + "\n".join(csv_rows) + "\n"
+    
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Write reports
+        zf.writestr("model_report.txt", text_report)
+        zf.writestr("metrics.csv", csv_content)
+        
+        # Write model params as a separate file
+        if model_params:
+            params_lines = [f"{k}: {v}" for k, v in model_params.items()]
+            zf.writestr("model_params.txt", "\n".join(params_lines) + "\n")
+        
+        # Save figures if provided
+        if predicted_vs_true_fig is not None:
+            try:
+                buf = io.BytesIO()
+                predicted_vs_true_fig.savefig(buf, format='png', dpi=200, bbox_inches='tight')
+                buf.seek(0)
+                zf.writestr('images/predicted_vs_true.png', buf.read())
+            except Exception:
+                pass
+        
+        # Create predictions CSV
+        predictions_df = pd.DataFrame({
+            'True_Value': y_test,
+            'Predicted_Value': y_pred,
+            'Residual': y_pred - y_test,
+            'Absolute_Error': np.abs(y_pred - y_test)
+        })
+        predictions_csv = io.StringIO()
+        predictions_df.to_csv(predictions_csv, index=False)
+        zf.writestr('predictions_detail.csv', predictions_csv.getvalue())
+        
+        # Add README
+        readme = """# Chemlara Regression Model Package
+
+This ZIP contains the complete model performance reports and visualizations.
+
+## Files Included:
+
+1. **model_report.txt** - Comprehensive performance metrics and interpretation
+2. **metrics.csv** - Key metrics in CSV format for easy import
+3. **predictions_detail.csv** - Detailed predictions with residuals
+4. **model_params.txt** - Model configuration parameters
+5. **images/** - Visualization plots (if available)
+   - predicted_vs_true.png - Scatter plot of predictions vs actual values
+6. **model_files/** - Trained model files (if included)
+   - trained_model.pkl - The trained TPOT model
+   - X_train_reference.pkl - Training data reference
+   - featurizer.pkl - Molecular featurizer
+
+## How to Use:
+
+To make predictions with this model:
+1. Load the model: `model = joblib.load('model_files/trained_model.pkl')`
+2. Load the featurizer: `featurizer = joblib.load('model_files/featurizer.pkl')`
+3. Featurize new molecules and predict
+
+For questions or support, refer to the Chemlara documentation.
+"""
+        zf.writestr("README.txt", readme)
+    
+    buffer.seek(0)
+    return buffer
+
+# Function to create batch prediction report ZIP
+def create_prediction_report_zip(predictions_df, smiles_col, prediction_col, individual_structures=None):
+    """Create a ZIP file containing all regression batch prediction outputs (CSV, summary, images)."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 1) Full predictions CSV
+        csv_buffer = io.StringIO()
+        predictions_df.to_csv(csv_buffer, index=False)
+        zip_file.writestr(f"regression_predictions_{timestamp}.csv", csv_buffer.getvalue())
+        
+        # 2) Summary text
+        summary_lines = [
+            "="*40,
+            "CHEMLARA REGRESSION BATCH PREDICTION",
+            "="*40,
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "",
+            "PREDICTION STATISTICS",
+            "-"*20,
+            f"Total Molecules: {len(predictions_df)}",
+            "",
+        ]
+        
+        if prediction_col in predictions_df.columns:
+            pred_values = predictions_df[prediction_col].dropna()
+            if len(pred_values) > 0:
+                summary_lines.append("PREDICTED VALUE DISTRIBUTION")
+                summary_lines.append("-"*20)
+                summary_lines.append(f"Mean Prediction:   {pred_values.mean():.4f}")
+                summary_lines.append(f"Median Prediction: {pred_values.median():.4f}")
+                summary_lines.append(f"Std Deviation:     {pred_values.std():.4f}")
+                summary_lines.append(f"Min Prediction:    {pred_values.min():.4f}")
+                summary_lines.append(f"Max Prediction:    {pred_values.max():.4f}")
+                summary_lines.append(f"25th Percentile:   {pred_values.quantile(0.25):.4f}")
+                summary_lines.append(f"75th Percentile:   {pred_values.quantile(0.75):.4f}")
+                summary_lines.append("")
+        
+        # Count successful vs failed predictions
+        successful = predictions_df[prediction_col].notna().sum()
+        failed = predictions_df[prediction_col].isna().sum()
+        summary_lines.append("PROCESSING SUMMARY")
+        summary_lines.append("-"*20)
+        summary_lines.append(f"Successful Predictions: {successful}")
+        summary_lines.append(f"Failed Predictions:     {failed}")
+        summary_lines.append("")
+        
+        zip_file.writestr(f"regression_prediction_summary_{timestamp}.txt", "\n".join(summary_lines))
+        
+        # 3) Individual images
+        if individual_structures:
+            base = "individual_predictions/"
+            for idx, images in enumerate(individual_structures):
+                if isinstance(images, dict):
+                    if images.get('fragment_map') is not None:
+                        buf = io.BytesIO()
+                        images['fragment_map'].save(buf, format='PNG', dpi=(300, 300))
+                        buf.seek(0)
+                        zip_file.writestr(f"{base}molecule_{idx+1}_fragment_map.png", buf.getvalue())
+                    if images.get('structure') is not None:
+                        buf = io.BytesIO()
+                        images['structure'].save(buf, format='PNG')
+                        buf.seek(0)
+                        zip_file.writestr(f"{base}molecule_{idx+1}_structure.png", buf.getvalue())
+        
+        # 4) README
+        readme = f"""# Chemlara Regression Batch Prediction Report
+
+This archive contains outputs from your regression batch prediction.
+
+## Files:
+
+1. **regression_predictions_{timestamp}.csv** - Full predictions with all data
+2. **regression_prediction_summary_{timestamp}.txt** - Summary statistics
+3. **individual_predictions/** - Fragment maps and structures (if available)
+
+## Columns in CSV:
+
+- {smiles_col}: Input SMILES notation
+- {prediction_col}: Predicted numerical property value
+- Additional columns from input file (preserved)
+
+## Interpretation:
+
+The predicted values represent the model's estimation of the target property
+for each molecule. Use the summary statistics to understand the distribution
+of predictions across your dataset.
+
+For molecules with failed predictions (NaN values), check:
+- SMILES validity
+- Molecule complexity
+- Feature generation compatibility
+
+---
+Generated by Chemlara Suite
+"""
+        zip_file.writestr("README.txt", readme)
+    
+    zip_buffer.seek(0)
+    return zip_buffer
+
 # --- Fragment Contribution Mapping for Circular Fingerprint ---
 def weight_to_google_color(weight, min_weight, max_weight):
     """Convert weight to color using improved HLS color scheme with better handling of edge cases"""
-    import colorsys
     
     # Handle edge cases
     if max_weight == min_weight:
@@ -811,7 +1059,6 @@ def weight_to_google_color(weight, min_weight, max_weight):
 def create_download_button_for_image(image, filename, button_text="📥 Download Image"):
     """Create a download button for PIL images"""
     try:
-        import io
         buf = io.BytesIO()
         image.save(buf, format='PNG', dpi=(300, 300))
         buf.seek(0)
@@ -831,7 +1078,6 @@ def draw_molecule_with_fragment_weights(mol, atom_weights, width=1200, height=12
     try:
         from rdkit.Chem.Draw import rdMolDraw2D
         from PIL import Image
-        import io
         
         # Create high-resolution drawer
         drawer = rdMolDraw2D.MolDraw2DCairo(width, height)
@@ -1011,7 +1257,6 @@ def generate_fragment_contribution_map(smiles, model, X_train, featurizer_obj, c
             # If no weights or all weights are similar, create artificial contrast
             if not weights_list:
                 # Create random weights for visualization
-                import random
                 weights_list = [(i, random.uniform(-1, 1)) for i in range(min(50, len(feature_df.columns)))]
             
             # Convert to bit weights dictionary
@@ -1208,6 +1453,7 @@ def main():
                 with col2:
                     with st.expander("🔧 Advanced Settings"):
                         generations = st.slider("Generations (Evolution Cycles)", min_value=1, max_value=50, value=5)
+                        population_size = st.slider("Population Size", min_value=10, max_value=100, value=20)
                         cv = st.slider("Cross-Validation Folds", min_value=2, max_value=10, value=5)
                         test_size = st.slider("Test Set Size", min_value=0.1, max_value=0.4, value=0.2, step=0.05)
                         verbosity = st.slider("Verbosity Level", min_value=0, max_value=3, value=2)
@@ -1224,7 +1470,7 @@ def main():
                     
                     result = preprocess_and_model(
                         df, smiles_col, activity_col, st.session_state.selected_featurizer_name, 
-                        generations, cv=cv, test_size=test_size, verbosity=verbosity, cfp_params=cfp_params
+                        generations, population_size=population_size, cv=cv, test_size=test_size, verbosity=verbosity, cfp_params=cfp_params
                     )
                     
                     if result[0] is not None:  # Check if modeling was successful
@@ -1267,6 +1513,117 @@ def main():
                         st.markdown("### 📊 Model Visualization")
                         fig = plot_predicted_vs_true(y_test, y_pred)
                         st.pyplot(fig, use_container_width=True)
+
+                        # Create comprehensive model package with ZIP
+                        st.markdown("### 📦 Download Model Package")
+                        
+                        try:
+                            with st.spinner("Creating comprehensive model package..."):
+                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                
+                                # Save featurizer
+                                featurizer_filename = f'featurizer_regression_{timestamp}.pkl'
+                                with open(featurizer_filename, 'wb') as f:
+                                    joblib.dump(featurizer_result, f)
+                                
+                                # Model configuration
+                                model_config = {
+                                    "model_type": "TPOT Regression",
+                                    "featurizer": st.session_state.selected_featurizer_name,
+                                    "generations": generations,
+                                    "population_size": population_size,
+                                    "cv_folds": cv,
+                                    "test_size": test_size,
+                                    "random_state": 42,
+                                    "training_samples": len(X_train_result),
+                                    "test_samples": len(y_test),
+                                    "n_features": X_train_result.shape[1],
+                                    "timestamp": timestamp
+                                }
+                                
+                                # Create performance report ZIP
+                                model_package_zip = create_model_performance_zip(
+                                    mse=mse,
+                                    rmse=rmse,
+                                    mae=mae,
+                                    r2=r2,
+                                    y_test=y_test,
+                                    y_pred=y_pred,
+                                    model_params=model_config,
+                                    predicted_vs_true_fig=fig
+                                )
+                                
+                                # Add model files to the ZIP
+                                zip_buffer = io.BytesIO(model_package_zip.getvalue())
+                                
+                                with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
+                                    # Add model files
+                                    with open('best_model_regression.pkl', 'rb') as f:
+                                        zip_file.writestr(f"model_files/best_model_regression_{timestamp}.pkl", f.read())
+                                    with open('X_train_regression.pkl', 'rb') as f:
+                                        zip_file.writestr(f"model_files/X_train_regression_{timestamp}.pkl", f.read())
+                                    with open(featurizer_filename, 'rb') as f:
+                                        zip_file.writestr(f"model_files/{featurizer_filename}", f.read())
+                                    
+                                    # Add model configuration JSON
+                                    config_json = json.dumps(model_config, indent=2, default=str)
+                                    zip_file.writestr(f"model_configuration_{timestamp}.json", config_json)
+                                    
+                                    # Add pipeline details
+                                    try:
+                                        pipeline_details = str(tpot.fitted_pipeline_)
+                                        zip_file.writestr(f"best_pipeline_{timestamp}.txt", pipeline_details)
+                                    except:
+                                        pass
+                                
+                                zip_buffer.seek(0)
+                                
+                                # Display comprehensive download button
+                                st.download_button(
+                                    label="� Download Complete Model Package (ZIP)",
+                                    data=zip_buffer.getvalue(),
+                                    file_name=f'regression_model_package_{timestamp}.zip',
+                                    mime='application/zip',
+                                    use_container_width=True,
+                                    help="Complete package with model files, configuration, performance metrics, and visualizations"
+                                )
+                                
+                        except Exception as zip_error:
+                            st.error(f"Error creating model package ZIP: {str(zip_error)}")
+                        
+                        # Individual file downloads (optional)
+                        with st.expander("📂 Download Individual Model Files"):
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                with open('best_model_regression.pkl', 'rb') as f:
+                                    st.download_button(
+                                        label='📥 Model',
+                                        data=f,
+                                        file_name='best_model_regression.pkl',
+                                        mime='application/octet-stream',
+                                        use_container_width=True
+                                    )
+                            with col2:
+                                with open('X_train_regression.pkl', 'rb') as f:
+                                    st.download_button(
+                                        label='📥 Training Data',
+                                        data=f,
+                                        file_name='X_train_regression.pkl',
+                                        mime='application/octet-stream',
+                                        use_container_width=True
+                                    )
+                            with col3:
+                                try:
+                                    with open(featurizer_filename, 'rb') as f:
+                                        st.download_button(
+                                            label='📥 Featurizer',
+                                            data=f,
+                                            file_name=featurizer_filename,
+                                            mime='application/octet-stream',
+                                            use_container_width=True
+                                        )
+                                except:
+                                    pass
 
             except Exception as e:
                 st.error(f"Error reading file: {str(e)}")
@@ -1393,7 +1750,6 @@ def main():
                                             # Fallback to regular structure
                                             st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
                                             from PIL import Image
-                                            import io
                                             
                                             # Convert RDKit image to PIL and resize
                                             img_buffer = io.BytesIO()
@@ -1407,7 +1763,6 @@ def main():
                                         # Fallback to regular structure
                                         st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
                                         from PIL import Image
-                                        import io
                                         
                                         # Convert RDKit image to PIL and resize
                                         img_buffer = io.BytesIO()
@@ -1427,7 +1782,6 @@ def main():
                                 # Fallback to regular structure
                                 st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
                                 from PIL import Image
-                                import io
                                 
                                 # Convert RDKit image to PIL and resize
                                 img_buffer = io.BytesIO()
@@ -1441,7 +1795,6 @@ def main():
                             # Display regular molecular structure for non-CFP featurizers
                             st.markdown(create_ios_card("Molecular Structure", "", "🧬"), unsafe_allow_html=True)
                             from PIL import Image
-                            import io
                             
                             # Convert RDKit image to PIL and resize
                             img_buffer = io.BytesIO()
@@ -1544,6 +1897,7 @@ def main():
                 if st.button("🚀 Run Batch Prediction", use_container_width=True):
                     predictions = []
                     failed_molecules = []
+                    individual_structures = []  # Collect structures for ZIP
                     
                     progress_bar = st.progress(0)
                     status_text = st.empty()
@@ -1560,9 +1914,32 @@ def main():
                         if result[0] is not None:
                             prediction, explanation_html, img, standardized_smiles = result
                             predictions.append(round(prediction, 4))
+                            
+                            # Collect structure images for ZIP
+                            structure_dict = {'structure': img}
+                            
+                            # Try to generate fragment map if using Circular Fingerprint
+                            if (st.session_state.get('trained_featurizer_name') == "Circular Fingerprint" and 
+                                st.session_state.selected_featurizer_name == "Circular Fingerprint"):
+                                try:
+                                    featurizer_obj = st.session_state.get('featurizer')
+                                    model = st.session_state.get('tpot_model')
+                                    X_train = st.session_state.get('X_train')
+                                    
+                                    if featurizer_obj and model and X_train is not None:
+                                        fragment_img = generate_fragment_contribution_map(
+                                            standardized_smiles, model, X_train, featurizer_obj
+                                        )
+                                        if fragment_img:
+                                            structure_dict['fragment_map'] = fragment_img
+                                except:
+                                    pass
+                            
+                            individual_structures.append(structure_dict)
                         else:
                             predictions.append(None)
                             failed_molecules.append(f"{idx + 1}: {smiles}")
+                            individual_structures.append(None)
                     
                     # Calculate processing time
                     processing_time = time.time() - start_time
@@ -1716,13 +2093,13 @@ def main():
                                             <div style="font-size: 1.5em; margin-right: 8px;">{prediction_icon}</div>
                                             <div>
                                                 <h3 style="color: {prediction_color}; margin: 0; font-weight: 700; font-size: 1.1em;">Property Value</h3>
-                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 11px;">Predicted Result</p>
+                                                <p style="margin: 2px 0 0 0; color: #8E8E93; font-size: 10px;">Predicted Result</p>
                                             </div>
                                         </div>
                                         <div style="background: rgba(0, 122, 255, 0.1); border-radius: 8px; padding: 8px; margin-bottom: 8px;">
                                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                                 <span style="color: #007AFF; font-weight: 600; font-size: 12px;">Value:</span>
-                                                <span style="color: #1D1D1F; font-weight: 700; font-size: 14px;">{prediction_value:.4f}</span>
+                                                <span style="color: #1D1D1F; font-weight: 700, font-size: 14px;">{prediction_value:.4f}</span>
                                             </div>
                                         </div>
                                         <div style="background: rgba(0, 0, 0, 0.05); border-radius: 6px; padding: 6px;">
@@ -1795,13 +2172,14 @@ def main():
                     st.dataframe(pred_df, use_container_width=True)
                     
                     # Download options
-                    col1, col2 = st.columns(2)
+                    st.markdown("### 📥 Download Results")
+                    col1, col2, col3 = st.columns(3)
                     
                     with col1:
                         # CSV download
                         csv_data = pred_df.to_csv(index=False)
                         st.download_button(
-                            "📥 Download as CSV",
+                            "� Download CSV",
                             data=csv_data,
                             file_name=f"batch_predictions_{int(time.time())}.csv",
                             mime="text/csv",
@@ -1816,12 +2194,37 @@ def main():
                         buffer.seek(0)
                         
                         st.download_button(
-                            "📥 Download as Excel",
+                            "� Download Excel",
                             data=buffer.getvalue(),
                             file_name=f"batch_predictions_{int(time.time())}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             use_container_width=True
                         )
+                    
+                    with col3:
+                        # ZIP download with full report
+                        try:
+                            # Collect individual structures if available
+                            individual_images = []
+                            if 'individual_structures' in locals() and individual_structures:
+                                individual_images = individual_structures
+                            
+                            zip_buf = create_prediction_report_zip(
+                                pred_df,
+                                smiles_col=pred_smiles_col,
+                                prediction_col='Predicted_Property',
+                                individual_structures=individual_images
+                            )
+                            st.download_button(
+                                label="📦 Download Full Report",
+                                data=zip_buf,
+                                file_name=f'regression_prediction_report_{int(time.time())}.zip',
+                                mime='application/zip',
+                                use_container_width=True,
+                                help="ZIP with CSV, summary, and individual images"
+                            )
+                        except Exception as e:
+                            st.error(f"Error creating ZIP report: {str(e)}")
 
             except Exception as e:
                 st.error(f"Error processing file: {str(e)}")
